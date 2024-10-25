@@ -261,6 +261,13 @@ message Lobby_Infos_pb {
     string owner_id = 5;
     map<string, Lobby_Member_Infos_pb> members = 6;
     string bucket_id = 7;
+    bool bAllowHostMigration = 8;
+    bool bRTCRoomEnabled = 9;
+    bool bAllowJoinById = 10;
+    bool bRejoinAfterKickRequiresInvite = 11;
+    bool bPresenceEnabled = 12;
+    bytes AllowedPlatformIds = 13;
+    uint32 AllowedPlatformIdsCount = 14;
 }
 
 message Lobby_Update_pb {

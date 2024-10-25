@@ -375,6 +375,11 @@ void EOSSDK_Lobby::CreateLobby(const EOS_Lobby_CreateLobbyOptions* Options, void
         case EOS_LOBBY_CREATELOBBY_API_009:
         {
             const EOS_Lobby_CreateLobbyOptions009* opts = reinterpret_cast<const EOS_Lobby_CreateLobbyOptions009*>(Options);
+            auto& infos = _lobbies[lobby_id];
+            infos.infos.set_allowedplatformids(opts->AllowedPlatformIds, opts->AllowedPlatformIdsCount);
+            infos.infos.set_allowedplatformidscount(opts->AllowedPlatformIdsCount);
+            infos.infos.set_ballowjoinbyid(opts->bEnableJoinById);
+            infos.infos.set_brejoinafterkickrequiresinvite(opts->bRejoinAfterKickRequiresInvite);
         }
         case EOS_LOBBY_CREATELOBBY_API_008:
         case EOS_LOBBY_CREATELOBBY_API_007:
@@ -383,6 +388,12 @@ void EOSSDK_Lobby::CreateLobby(const EOS_Lobby_CreateLobbyOptions* Options, void
             if (opts->LobbyId != NULL) {
                 lobby_id = std::string(opts->LobbyId);
             }
+            auto& infos = _lobbies[lobby_id];
+            std::string bucket_id(std::move((opts->BucketId)));
+            infos.infos.set_bucket_id(bucket_id);
+            infos.infos.set_ballowhostmigration(!opts->bDisableHostMigration);
+            infos.infos.set_brtcroomenabled(opts->bEnableRTCRoom);
+            infos.infos.set_bpresenceenabled(opts->bPresenceEnabled);
 
         }
         //case EOS_LOBBY_CREATELOBBY_API_006:
