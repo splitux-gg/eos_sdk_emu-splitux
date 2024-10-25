@@ -8,7 +8,7 @@ enum { k_iP2PCallbackBase = 9000 };
 // next free callback_id: k_iP2PCallbackBase + 4
 
 #define EOS_P2P_SocketId                                  EOS_P2P_SocketId001
-#define EOS_P2P_SendPacketOptions                         EOS_P2P_SendPacketOptions002
+#define EOS_P2P_SendPacketOptions                         EOS_P2P_SendPacketOptions003
 #define EOS_P2P_GetNextReceivedPacketSizeOptions          EOS_P2P_GetNextReceivedPacketSizeOptions002
 #define EOS_P2P_ReceivePacketOptions                      EOS_P2P_ReceivePacketOptions002
 #define EOS_P2P_AddNotifyPeerConnectionRequestOptions     EOS_P2P_AddNotifyPeerConnectionRequestOptions001
@@ -36,7 +36,7 @@ enum { k_iP2PCallbackBase = 9000 };
 #include "eos_p2p_types1.5.0.h"
 
 #define EOS_P2P_SOCKETID_API_LATEST                           EOS_P2P_SOCKETID_API_001
-#define EOS_P2P_SENDPACKET_API_LATEST                         EOS_P2P_SENDPACKET_API_002
+#define EOS_P2P_SENDPACKET_API_LATEST                         EOS_P2P_SENDPACKET_API_003
 #define EOS_P2P_GETNEXTRECEIVEDPACKETSIZE_API_LATEST          EOS_P2P_GETNEXTRECEIVEDPACKETSIZE_API_002
 #define EOS_P2P_RECEIVEPACKET_API_LATEST                      EOS_P2P_RECEIVEPACKET_API_002
 #define EOS_P2P_ADDNOTIFYPEERCONNECTIONREQUEST_API_LATEST     EOS_P2P_ADDNOTIFYPEERCONNECTIONREQUEST_API_001
