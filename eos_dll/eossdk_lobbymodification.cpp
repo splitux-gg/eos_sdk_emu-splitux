@@ -105,6 +105,17 @@ EOS_EResult EOSSDK_LobbyModification::SetMaxMembers(const EOS_LobbyModification_
     return EOS_EResult::EOS_Success;
 }
 
+EOS_EResult EOSSDK_LobbyModification::SetInvitesAllowed(const EOS_LobbyModification_SetInvitesAllowedOptions* Options)
+{
+    TRACE_FUNC();
+    std::lock_guard<std::mutex> lk(_local_mutex);
+
+    _infos.set_invites_allowed(Options->bInvitesAllowed);
+
+    _lobby_modified = true;
+    return EOS_EResult::EOS_Success;
+}
+
 /**
  * Associate an attribute with this lobby
  * An attribute is something may be public or private with the lobby.

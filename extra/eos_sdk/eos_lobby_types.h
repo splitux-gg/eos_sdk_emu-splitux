@@ -31,7 +31,7 @@ enum { k_iLobbyCallbackBase = 7000 };
 #define EOS_Lobby_CopyLobbyDetailsHandleOptions             EOS_Lobby_CopyLobbyDetailsHandleOptions001
 #define EOS_Lobby_GetRTCRoomNameOptions                     EOS_Lobby_GetRTCRoomNameOptions001
 #define EOS_Lobby_IsRTCRoomConnectedOptions                 EOS_Lobby_IsRTCRoomConnectedOptions001
-#define EOS_Lobby_AddNotifyRTCRoomConnectionChangedOptions  EOS_Lobby_AddNotifyRTCRoomConnectionChangedOptions001
+#define EOS_Lobby_AddNotifyRTCRoomConnectionChangedOptions  EOS_Lobby_AddNotifyRTCRoomConnectionChangedOptions002
 #define EOS_Lobby_AttributeData                             EOS_Lobby_AttributeData001
 #define EOS_Lobby_Attribute                                 EOS_Lobby_Attribute001
 #define EOS_LobbyModification_SetBucketIdOptions            EOS_LobbyModification_SetBucketIdOptions001
