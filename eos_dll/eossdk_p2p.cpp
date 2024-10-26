@@ -86,10 +86,28 @@ EOS_EResult EOSSDK_P2P::SendPacket(const EOS_P2P_SendPacketOptions* Options)
 
     p2p_state_t& p2p_state = _p2p_connections[Options->RemoteUserId];
     P2P_Data_Message_pb data;
-    data.set_data(reinterpret_cast<const char*>(Options->Data), Options->DataLengthBytes);
-    data.set_channel(Options->Channel);
-    data.set_socket_name(Options->SocketId->SocketName);
-    data.set_user_id(Options->LocalUserId->to_string());
+
+    switch (Options->ApiVersion)
+    {
+        case EOS_P2P_SENDPACKET_API_003:
+        {
+            const EOS_P2P_SendPacketOptions003* opts = reinterpret_cast<const EOS_P2P_SendPacketOptions003*>(Options);
+            APP_LOG(Log::LogLevel::INFO, "Lol %d", opts->bAllowDelayedDelivery);
+        }
+        case EOS_P2P_SENDPACKET_API_002:
+        {
+            const EOS_P2P_SendPacketOptions002* opts = reinterpret_cast<const EOS_P2P_SendPacketOptions002*>(Options);
+            
+        }
+        case EOS_P2P_SENDPACKET_API_001:
+        {
+            const EOS_P2P_SendPacketOptions001* opts = reinterpret_cast<const EOS_P2P_SendPacketOptions001*>(Options);
+            data.set_data(reinterpret_cast<const char*>(Options->Data), Options->DataLengthBytes);
+            data.set_channel(Options->Channel);
+            data.set_socket_name(Options->SocketId->SocketName);
+            data.set_user_id(Options->LocalUserId->to_string());
+        }
+    }
 
     switch(p2p_state.status)
     {
@@ -311,11 +329,13 @@ EOS_NotificationId EOSSDK_P2P::AddNotifyPeerConnectionEstablished(const EOS_P2P_
 
     pFrameResult_t res(new FrameResult);
 
-    EOS_P2P_OnPeerConnectionEstablishedInfo& oicri = res->CreateCallback<EOS_P2P_OnPeerConnectionEstablishedInfo>((CallbackFunc)ConnectionEstablishedHandler);
-    oicri.ClientData = ClientData;
-    oicri.LocalUserId = Settings::Inst().productuserid;
-    oicri.RemoteUserId = GetProductUserId(sdk::NULL_USER_ID);
-    oicri.SocketId = new EOS_P2P_SocketId;
+    EOS_P2P_OnPeerConnectionEstablishedInfo& opcei = res->CreateCallback<EOS_P2P_OnPeerConnectionEstablishedInfo>((CallbackFunc)ConnectionEstablishedHandler);
+    opcei.ClientData = ClientData;
+    opcei.LocalUserId = Settings::Inst().productuserid;
+    opcei.RemoteUserId = GetProductUserId(sdk::NULL_USER_ID);
+    opcei.SocketId = new EOS_P2P_SocketId;
+    opcei.ConnectionType = EOS_EConnectionEstablishedType::EOS_CET_Reconnection;
+    opcei.NetworkType = EOS_ENetworkConnectionType::EOS_NCT_DirectConnection;
 
     return GetCB_Manager().add_notification(this, res);
 }
@@ -358,11 +378,11 @@ EOS_NotificationId EOSSDK_P2P::AddNotifyPeerConnectionInterrupted(const EOS_P2P_
 
     pFrameResult_t res(new FrameResult);
 
-    EOS_P2P_OnPeerConnectionInterruptedInfo& oicri = res->CreateCallback<EOS_P2P_OnPeerConnectionInterruptedInfo>((CallbackFunc)ConnectionInterruptedHandler);
-    oicri.ClientData = ClientData;
-    oicri.LocalUserId = Settings::Inst().productuserid;
-    oicri.RemoteUserId = GetProductUserId(sdk::NULL_USER_ID);
-    oicri.SocketId = new EOS_P2P_SocketId;
+    EOS_P2P_OnPeerConnectionInterruptedInfo& opcii = res->CreateCallback<EOS_P2P_OnPeerConnectionInterruptedInfo>((CallbackFunc)ConnectionInterruptedHandler);
+    opcii.ClientData = ClientData;
+    opcii.LocalUserId = Settings::Inst().productuserid;
+    opcii.RemoteUserId = GetProductUserId(sdk::NULL_USER_ID);
+    opcii.SocketId = new EOS_P2P_SocketId;
 
     return GetCB_Manager().add_notification(this, res);
 }
