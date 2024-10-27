@@ -9,9 +9,9 @@ enum { k_iLobbyCallbackBase = 7000 };
 
 #define EOS_LobbyDetails_Info                               EOS_LobbyDetails_Info003
 #define EOS_Lobby_LocalRTCOptions                           EOS_Lobby_LocalRTCOptions001
-#define EOS_Lobby_CreateLobbyOptions                        EOS_Lobby_CreateLobbyOptions007
+#define EOS_Lobby_CreateLobbyOptions                        EOS_Lobby_CreateLobbyOptions009
 #define EOS_Lobby_DestroyLobbyOptions                       EOS_Lobby_DestroyLobbyOptions001
-#define EOS_Lobby_JoinLobbyOptions                          EOS_Lobby_JoinLobbyOptions002
+#define EOS_Lobby_JoinLobbyOptions                          EOS_Lobby_JoinLobbyOptions003
 #define EOS_Lobby_LeaveLobbyOptions                         EOS_Lobby_LeaveLobbyOptions001
 #define EOS_Lobby_UpdateLobbyModificationOptions            EOS_Lobby_UpdateLobbyModificationOptions001
 #define EOS_Lobby_UpdateLobbyOptions                        EOS_Lobby_UpdateLobbyOptions001
@@ -38,9 +38,9 @@ enum { k_iLobbyCallbackBase = 7000 };
 #define EOS_LobbyModification_SetPermissionLevelOptions     EOS_LobbyModification_SetPermissionLevelOptions001
 #define EOS_LobbyModification_SetMaxMembersOptions          EOS_LobbyModification_SetMaxMembersOptions001
 #define EOS_LobbyModification_SetInvitesAllowedOptions      EOS_LobbyModification_SetInvitesAllowedOptions001
-#define EOS_LobbyModification_AddAttributeOptions           EOS_LobbyModification_AddAttributeOptions001
+#define EOS_LobbyModification_AddAttributeOptions           EOS_LobbyModification_AddAttributeOptions002
 #define EOS_LobbyModification_RemoveAttributeOptions        EOS_LobbyModification_RemoveAttributeOptions001
-#define EOS_LobbyModification_AddMemberAttributeOptions     EOS_LobbyModification_AddMemberAttributeOptions001
+#define EOS_LobbyModification_AddMemberAttributeOptions     EOS_LobbyModification_AddMemberAttributeOptions002
 #define EOS_LobbyModification_RemoveMemberAttributeOptions  EOS_LobbyModification_RemoveMemberAttributeOptions001
 #define EOS_LobbyDetails_GetLobbyOwnerOptions               EOS_LobbyDetails_GetLobbyOwnerOptions001
 #define EOS_LobbyDetails_CopyInfoOptions                    EOS_LobbyDetails_CopyInfoOptions001
@@ -76,9 +76,9 @@ enum { k_iLobbyCallbackBase = 7000 };
 
 #define EOS_LOBBYDETAILS_INFO_API_LATEST                        EOS_LOBBYDETAILS_INFO_API_003
 #define EOS_LOBBY_LOCALRTCOPTIONS_API_LATEST                    EOS_LOBBY_LOCALRTCOPTIONS_API_001
-#define EOS_LOBBY_CREATELOBBY_API_LATEST                        EOS_LOBBY_CREATELOBBY_API_007
+#define EOS_LOBBY_CREATELOBBY_API_LATEST                        EOS_LOBBY_CREATELOBBY_API_009
 #define EOS_LOBBY_DESTROYLOBBY_API_LATEST                       EOS_LOBBY_DESTROYLOBBY_API_001
-#define EOS_LOBBY_JOINLOBBY_API_LATEST                          EOS_LOBBY_JOINLOBBY_API_002
+#define EOS_LOBBY_JOINLOBBY_API_LATEST                          EOS_LOBBY_JOINLOBBY_API_003
 #define EOS_LOBBY_LEAVELOBBY_API_LATEST                         EOS_LOBBY_LEAVELOBBY_API_001
 #define EOS_LOBBY_UPDATELOBBYMODIFICATION_API_LATEST            EOS_LOBBY_UPDATELOBBYMODIFICATION_API_001
 #define EOS_LOBBY_UPDATELOBBY_API_LATEST                        EOS_LOBBY_UPDATELOBBY_API_001
@@ -105,9 +105,9 @@ enum { k_iLobbyCallbackBase = 7000 };
 #define EOS_LOBBYMODIFICATION_SETPERMISSIONLEVEL_API_LATEST     EOS_LOBBYMODIFICATION_SETPERMISSIONLEVEL_API_001
 #define EOS_LOBBYMODIFICATION_SETMAXMEMBERS_API_LATEST          EOS_LOBBYMODIFICATION_SETMAXMEMBERS_API_001
 #define EOS_LOBBYMODIFICATION_SETINVITESALLOWED_API_LATEST      EOS_LOBBYMODIFICATION_SETINVITESALLOWED_API_001
-#define EOS_LOBBYMODIFICATION_ADDATTRIBUTE_API_LATEST           EOS_LOBBYMODIFICATION_ADDATTRIBUTE_API_001
+#define EOS_LOBBYMODIFICATION_ADDATTRIBUTE_API_LATEST           EOS_LOBBYMODIFICATION_ADDATTRIBUTE_API_002
 #define EOS_LOBBYMODIFICATION_REMOVEATTRIBUTE_API_LATEST        EOS_LOBBYMODIFICATION_REMOVEATTRIBUTE_API_001
-#define EOS_LOBBYMODIFICATION_ADDMEMBERATTRIBUTE_API_LATEST     EOS_LOBBYMODIFICATION_ADDMEMBERATTRIBUTE_API_001
+#define EOS_LOBBYMODIFICATION_ADDMEMBERATTRIBUTE_API_LATEST     EOS_LOBBYMODIFICATION_ADDMEMBERATTRIBUTE_API_002
 #define EOS_LOBBYMODIFICATION_REMOVEMEMBERATTRIBUTE_API_LATEST  EOS_LOBBYMODIFICATION_REMOVEMEMBERATTRIBUTE_API_001
 #define EOS_LOBBYDETAILS_GETLOBBYOWNER_API_LATEST               EOS_LOBBYDETAILS_GETLOBBYOWNER_API_001
 #define EOS_LOBBYDETAILS_COPYINFO_API_LATEST                    EOS_LOBBYDETAILS_COPYINFO_API_001

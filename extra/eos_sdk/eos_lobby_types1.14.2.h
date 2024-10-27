@@ -109,10 +109,10 @@ EOS_STRUCT(EOS_Lobby_JoinLobbyOptions003, (
 EOS_STRUCT(EOS_LobbyModification_AddAttributeOptions001, (
 	/** API Version: Set this to EOS_LOBBYMODIFICATION_ADDATTRIBUTE_API_LATEST. */
 	int32_t ApiVersion;
-/** Key/Value pair describing the attribute to add to the lobby */
-const EOS_Lobby_AttributeData* Attribute;
-/** Is this attribute public or private to the lobby and its members */
-EOS_ELobbyAttributeVisibility Visibility;
+	/** Key/Value pair describing the attribute to add to the lobby */
+	const EOS_Lobby_AttributeData* Attribute;
+	/** Is this attribute public or private to the lobby and its members */
+	EOS_ELobbyAttributeVisibility Visibility;
 ));
 
 
@@ -125,10 +125,10 @@ EOS_ELobbyAttributeVisibility Visibility;
 EOS_STRUCT(EOS_LobbyModification_AddMemberAttributeOptions001, (
 	/** API Version: Set this to EOS_LOBBYMODIFICATION_ADDMEMBERATTRIBUTE_API_LATEST. */
 	int32_t ApiVersion;
-/** Key/Value pair describing the attribute to add to the lobby member */
-const EOS_Lobby_AttributeData* Attribute;
-/** Is this attribute public or private to the rest of the lobby members */
-EOS_ELobbyAttributeVisibility Visibility;
+	/** Key/Value pair describing the attribute to add to the lobby member */
+	const EOS_Lobby_AttributeData* Attribute;
+	/** Is this attribute public or private to the rest of the lobby members */
+	EOS_ELobbyAttributeVisibility Visibility;
 ));
 
 
