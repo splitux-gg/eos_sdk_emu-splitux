@@ -259,7 +259,7 @@ void EOSSDK_UserInfo::QueryUserInfoByExternalAccount(const EOS_UserInfo_QueryUse
  * @see EOS_UserInfo_CopyUserInfoOptions
  * @see EOS_UserInfo_Release
  */
-EOS_EResult EOSSDK_UserInfo::CopyUserInfo(const EOS_UserInfo_CopyUserInfoOptions* Options, EOS_UserInfo** OutUserInfo)
+EOS_EResult EOSSDK_UserInfo::CopyUserInfo(const EOS_UserInfo_CopyUserInfoOptions* Options, void** OutUserInfo)
 {
     TRACE_FUNC();
     GLOBAL_LOCK();
@@ -274,21 +274,46 @@ EOS_EResult EOSSDK_UserInfo::CopyUserInfo(const EOS_UserInfo_CopyUserInfoOptions
 
     UserInfo_Info_pb* userinfo = get_userinfo(Options->TargetUserId);
 
-    EOS_UserInfo* infos = new EOS_UserInfo();
-    *OutUserInfo = infos;
+    switch (Options->ApiVersion) {
+    case EOS_USERINFO_COPYUSERINFO_API_003: {
+            EOS_UserInfo003* infos = new EOS_UserInfo003();
+            *OutUserInfo = infos;
 
-    if (userinfo == nullptr)
-    {
-        memset(infos, 0, sizeof(*infos));
-        return EOS_EResult::EOS_NotFound;
+            if (userinfo == nullptr)
+            {
+                memset(infos, 0, sizeof(*infos));
+                return EOS_EResult::EOS_NotFound;
+            }
+            infos->ApiVersion = Options->ApiVersion;
+            infos->Country = (userinfo->country().empty() ? nullptr : userinfo->country().c_str());
+            infos->PreferredLanguage = (userinfo->preferredlanguage().empty() ? nullptr : userinfo->preferredlanguage().c_str());
+            infos->DisplayName = (userinfo->displayname().empty() ? nullptr : userinfo->displayname().c_str());
+            infos->Nickname = (userinfo->nickname().empty() ? nullptr : userinfo->nickname().c_str());
+            infos->UserId = Options->TargetUserId;
+            infos->DisplayNameSanitized = infos->DisplayName;
+            break;
+        }
+        case EOS_USERINFO_COPYUSERINFO_API_002:
+        case EOS_USERINFO_COPYUSERINFO_API_001:
+        {
+            EOS_UserInfo002* infos = new EOS_UserInfo002();
+            *OutUserInfo = infos;
+
+            if (userinfo == nullptr)
+            {
+                memset(infos, 0, sizeof(*infos));
+                return EOS_EResult::EOS_NotFound;
+            }
+            infos->ApiVersion = Options->ApiVersion;
+            infos->Country = (userinfo->country().empty() ? nullptr : userinfo->country().c_str());
+            infos->PreferredLanguage = (userinfo->preferredlanguage().empty() ? nullptr : userinfo->preferredlanguage().c_str());
+            infos->DisplayName = (userinfo->displayname().empty() ? nullptr : userinfo->displayname().c_str());
+            infos->Nickname = (userinfo->nickname().empty() ? nullptr : userinfo->nickname().c_str());
+            infos->UserId = Options->TargetUserId;
+        }
     }
    
-    infos->ApiVersion        = EOS_USERINFO_COPYUSERINFO_API_LATEST;
-    infos->Country           = (userinfo->country().empty()           ? nullptr : userinfo->country().c_str());
-    infos->PreferredLanguage = (userinfo->preferredlanguage().empty() ? nullptr : userinfo->preferredlanguage().c_str());
-    infos->DisplayName       = (userinfo->displayname().empty()       ? nullptr : userinfo->displayname().c_str());
-    infos->Nickname          = (userinfo->nickname().empty()          ? nullptr : userinfo->nickname().c_str());
-    infos->UserId            = Options->TargetUserId;
+
 
     return EOS_EResult::EOS_Success;
 }

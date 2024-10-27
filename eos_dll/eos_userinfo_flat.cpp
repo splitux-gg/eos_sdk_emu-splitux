@@ -59,7 +59,7 @@ EOS_DECLARE_FUNC(void) EOS_UserInfo_QueryUserInfoByExternalAccount(EOS_HUserInfo
     pInst->QueryUserInfoByExternalAccount(Options, ClientData, CompletionDelegate);
 }
 
-EOS_DECLARE_FUNC(EOS_EResult) EOS_UserInfo_CopyUserInfo(EOS_HUserInfo Handle, const EOS_UserInfo_CopyUserInfoOptions* Options, EOS_UserInfo** OutUserInfo)
+EOS_DECLARE_FUNC(EOS_EResult) EOS_UserInfo_CopyUserInfo(EOS_HUserInfo Handle, const EOS_UserInfo_CopyUserInfoOptions* Options, void** OutUserInfo)
 {
     if (Handle == nullptr)
         return EOS_EResult::EOS_InvalidParameters;
