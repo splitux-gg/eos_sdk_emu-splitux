@@ -45,6 +45,7 @@ public:
     std::string savepath;
     std::string gamename;
     std::string appid;
+    std::string custom_broadcast;
     bool unlock_dlcs;
     bool enable_overlay;
     bool disable_online_networking;

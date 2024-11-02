@@ -956,6 +956,29 @@ bool Network::SendBroadcast(Network_Message_pb& msg)
     max_compressed_message_size = std::max<uint64_t>(max_compressed_message_size, buffer.length());
 #endif
 
+    if (!Settings::Inst().custom_broadcast.empty()) {
+        ipv4_addr addr;
+        for (uint16_t port = network_port; port < max_network_port; ++port) {
+            addr.set_port(port);
+            addr.from_string(Settings::Inst().custom_broadcast);
+            for (uint16_t addr_lo = 0; addr_lo < 255; ++addr_lo) {
+                addr.set_ip( (addr.get_ip() & 0xffffff00) | addr_lo );
+                try
+                {
+                    _udp_socket.sendto(addr, buffer.data(), buffer.length());
+                    //APP_LOG(Log::LogLevel::TRACE, "Send broadcast");
+                }
+                catch (socket_exception& e)
+                {
+                    //APP_LOG(Log::LogLevel::WARN, "Udp socket exception: %s", e.what());
+                    return false;
+                }
+            }
+        }
+
+        return true;
+    }
+
     for (auto& brd : broadcasts)
     {
         for (uint16_t port = network_port; port < max_network_port; ++port)

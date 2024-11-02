@@ -24,6 +24,7 @@
 #endif
 
 #include "common_includes.h"
+#include "settings.h"
 #include "task.h"
 
 class IRunNetwork

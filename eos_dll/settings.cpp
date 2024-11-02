@@ -165,6 +165,7 @@ void Settings::load_settings()
     unlock_dlcs               = get_setting(settings, "unlock_dlcs", bool(true));
     enable_overlay            = get_setting(settings, "enable_overlay", bool(true));
     disable_online_networking = get_setting(settings, "disable_online_networking", bool(false));
+    custom_broadcast          = get_setting(settings, "custom_broadcast", std::string(""));
     savepath                  = get_setting(settings, "savepath", std::string("appdata"));
 
     std::string productuserid = get_setting(settings, "productuserid", generate_account_id_from_name(appid + userid->to_string()));
@@ -212,6 +213,7 @@ void Settings::save_settings()
 #ifndef DISABLE_LOG
     settings["log_level"]                 = Log::loglevel_to_str();
 #endif
+    settings["custom_broadcast"]          = custom_broadcast;
     settings["savepath"]                  = savepath;
 
     save_json(config_path, settings);
