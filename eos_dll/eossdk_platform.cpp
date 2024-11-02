@@ -671,6 +671,26 @@ EOS_EResult EOSSDK_Platform::CheckForLauncherAndRestart()
 }
 
 /**
+ * Notify a change in application state.
+ *
+ * @note Calling SetApplicationStatus must happen before Tick when foregrounding for the cases where we won't get the background notification.
+ *
+ * @param NewStatus The new status for the application.
+ *
+ * @return An EOS_EResult that indicates whether we changed the application status successfully.
+ *         EOS_Success if the application was changed successfully.
+ *         EOS_InvalidParameters if the value of NewStatus is invalid.
+ *         EOS_NotImplemented if EOS_AS_BackgroundConstrained or EOS_AS_BackgroundUnconstrained are attempted to be set on platforms that do not have such application states.
+ */
+EOS_EResult EOSSDK_Platform::SetApplicationStatus(const EOS_EApplicationStatus NewStatus) {
+    TRACE_FUNC();
+
+    _application_status = NewStatus;
+
+    return EOS_EResult::EOS_Success;
+}
+
+/**
  * Notify a change in network state.
  *
  * @param NewStatus The new network status.
@@ -700,5 +720,6 @@ EOS_ENetworkStatus EOSSDK_Platform::GetNetworkStatus() {
 
     return _network_status;
 }
+
 
 }

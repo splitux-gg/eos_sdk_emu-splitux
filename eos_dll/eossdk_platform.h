@@ -67,6 +67,7 @@ namespace sdk
         std::string _cache_directory;
         uint32_t    _ticket_budget_in_milliseconds;
         EOS_ENetworkStatus _network_status;
+        EOS_EApplicationStatus _application_status;
 
         Callback_Manager      *_cb_manager;
         Network               *_network;
@@ -123,6 +124,7 @@ namespace sdk
         EOS_EResult SetOverrideCountryCode(const char* NewCountryCode);
         EOS_EResult SetOverrideLocaleCode(const char* NewLocaleCode);
         EOS_EResult CheckForLauncherAndRestart();
+        EOS_EResult SetApplicationStatus(const EOS_EApplicationStatus NewStatus);
         EOS_EResult SetNetworkStatus(const EOS_ENetworkStatus NewStatus);
         EOS_ENetworkStatus GetNetworkStatus();
     };
