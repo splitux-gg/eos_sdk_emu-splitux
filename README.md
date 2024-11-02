@@ -1,4 +1,8 @@
-# Nemirtingas Epic Emulator
+# Nemirtingas Epic Emulator Redux
+
+Full credit to my mentor, Nemirtingas, whose original work—driven by his enthusiastic support for piracy and strong opposition to Epic Games—provided the essential foundation for this emulator. While I personally disagree with his stance on piracy, I can’t overlook the significant impact of his contributions. Although his original repository was taken down—likely due to reasons best left unspoken—his influence remains crucial to this effort. For those interested in further technical support or guidance, Nemirtingas is available on http://element.io, where he’s more than willing to assist those aligned with his views on open software.
+
+# Debug log levels
 
 This is a project to try to understand how the eos api works under the hood.
 
