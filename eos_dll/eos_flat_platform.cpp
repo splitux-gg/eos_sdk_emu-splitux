@@ -347,7 +347,7 @@ EOS_DECLARE_FUNC(EOS_EResult) EOS_Platform_GetDesktopCrossplayStatus(EOS_HPlatfo
         return EOS_EResult::EOS_InvalidParameters;
 
     auto pInst = reinterpret_cast<EOSSDK_Platform*>(Handle);
-    return pInst->CheckForLauncherAndRestart();
+    return pInst->GetDesktopCrossplayStatus(Options, OutDesktopCrossplayStatusInfo);
 }
 
 EOS_DECLARE_FUNC(EOS_EResult) EOS_Platform_SetApplicationStatus(EOS_HPlatform Handle, const EOS_EApplicationStatus NewStatus) {

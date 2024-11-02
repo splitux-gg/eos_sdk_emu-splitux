@@ -124,6 +124,7 @@ namespace sdk
         EOS_EResult SetOverrideCountryCode(const char* NewCountryCode);
         EOS_EResult SetOverrideLocaleCode(const char* NewLocaleCode);
         EOS_EResult CheckForLauncherAndRestart();
+        EOS_EResult GetDesktopCrossplayStatus(const EOS_Platform_GetDesktopCrossplayStatusOptions* Options, EOS_Platform_DesktopCrossplayStatusInfo* OutDesktopCrossplayStatusInfo);
         EOS_EResult SetApplicationStatus(const EOS_EApplicationStatus NewStatus);
         EOS_EApplicationStatus GetApplicationStatus();
         EOS_EResult SetNetworkStatus(const EOS_ENetworkStatus NewStatus);

@@ -671,6 +671,33 @@ EOS_EResult EOSSDK_Platform::CheckForLauncherAndRestart()
 }
 
 /**
+ * Windows only.
+ * Checks that the application is ready to use desktop crossplay functionality, with the necessary prerequisites having been met.
+ *
+ * This function verifies that the application was launched through the Bootstrapper application,
+ * the redistributable service has been installed and is running in the background,
+ * and that the overlay has been loaded successfully.
+ *
+ * On Windows, the desktop crossplay functionality is required to use Epic accounts login
+ * with applications that are distributed outside the Epic Games Store.
+ *
+ * @param Options input structure that specifies the API version.
+ * @param OutDesktopCrossplayStatusInfo output structure to receive the desktop crossplay status information.
+ *
+ * @return An EOS_EResult is returned to indicate success or an error.
+ *		   EOS_NotImplemented is returned on non-Windows platforms.
+ */
+EOS_EResult EOSSDK_Platform::GetDesktopCrossplayStatus(const EOS_Platform_GetDesktopCrossplayStatusOptions* Options, EOS_Platform_DesktopCrossplayStatusInfo* OutDesktopCrossplayStatusInfo)
+{
+    TRACE_FUNC();
+
+    //TODO: Implement crossplay status
+
+    return EOS_EResult::EOS_NotImplemented;
+}
+
+
+/**
  * Notify a change in application state.
  *
  * @note Calling SetApplicationStatus must happen before Tick when foregrounding for the cases where we won't get the background notification.
