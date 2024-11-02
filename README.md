@@ -44,6 +44,7 @@ OFF  : no logs     , saves cpu usage when running the debug versions
 - { "unlock_dlcs": true|false }: This will try to enable all dlcs/items that the game requests. If the game wants more infos on em it might not work. (Like unlock_all_dlcs on a steam emu, some need you to provide the appid = name).
 - { "log_level": "OFF|FATAL|ERR|WARN|INFO|DEBUG|TRACE" }: Decides how verbose the emulator will be, for debugging purpose. Defaults to OFF
 - { "language": "en" }: Sets the user language. It follows the ISO639 language codes. Search on the web for your language code if needed. Defaults to "en".
+- { "custom_broadcast": "192.168.200.255" }: Sets an IP subnet for custom broadcasts. If your LAN software does not allow broadcast messages (ex. nebula), you will need to provide the subnet of your IP range. The last number is ignored and can be any value from 0 to 255
 
 # Building with windows for dummies
 - Install Visual Studio 17 2022. You want C/C++ app support.
