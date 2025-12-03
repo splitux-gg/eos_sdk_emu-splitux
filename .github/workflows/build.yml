@@ -23,7 +23,7 @@ jobs:
       - name: Setup vcpkg
         uses: lukka/run-vcpkg@v11
         with:
-          vcpkgGitCommitId: 'a34c873a9717a888f58dc05268dea15592c2f0ff'
+          runVcpkgInstall: false
 
       - name: Install dependencies
         run: |
@@ -52,21 +52,29 @@ jobs:
 
   build-linux:
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        arch: [64]  # 32-bit Linux is rarely needed
 
     steps:
       - uses: actions/checkout@v4
 
+      - name: Setup vcpkg
+        uses: lukka/run-vcpkg@v11
+        with:
+          runVcpkgInstall: false
+
       - name: Install dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y cmake build-essential libprotobuf-dev protobuf-compiler nlohmann-json3-dev
+          sudo apt-get install -y cmake build-essential
+          vcpkg install protobuf:x64-linux
+          vcpkg install nlohmann-json:x64-linux
 
-      - name: Configure CMake (64-bit)
-        if: matrix.arch == 64
-        run: cmake -B build -S . -DX64=ON -DCMAKE_BUILD_TYPE=Release
+      - name: Configure CMake
+        run: |
+          cmake -B build -S . \
+            -DCMAKE_TOOLCHAIN_FILE="${{ github.workspace }}/vcpkg/scripts/buildsystems/vcpkg.cmake" \
+            -DVCPKG_TARGET_TRIPLET=x64-linux \
+            -DX64=ON \
+            -DCMAKE_BUILD_TYPE=Release
 
       - name: Build
         run: cmake --build build --config Release
@@ -77,12 +85,13 @@ jobs:
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: linux-${{ matrix.arch }}
-          path: release/linux${{ matrix.arch }}/
+          name: linux-64
+          path: release/linux64/
 
   package:
     needs: [build-windows, build-linux]
     runs-on: ubuntu-latest
+    if: always()
 
     steps:
       - uses: actions/checkout@v4
@@ -91,16 +100,19 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           path: artifacts
+        continue-on-error: true
 
       - name: Package for splitux
         run: |
           mkdir -p dist/{win64,win32,linux64}
-          cp -r artifacts/windows-x64/* dist/win64/ || true
-          cp -r artifacts/windows-x86/* dist/win32/ || true
-          cp -r artifacts/linux-64/* dist/linux64/ || true
+          cp -r artifacts/windows-x64/* dist/win64/ 2>/dev/null || echo "No win64 artifacts"
+          cp -r artifacts/windows-x86/* dist/win32/ 2>/dev/null || echo "No win32 artifacts"
+          cp -r artifacts/linux-64/* dist/linux64/ 2>/dev/null || echo "No linux64 artifacts"
+          ls -la dist/
 
       - name: Upload combined package
         uses: actions/upload-artifact@v4
         with:
           name: eos-sdk-emu-splitux
           path: dist/
+        if: hashFiles('dist/**') != ''
