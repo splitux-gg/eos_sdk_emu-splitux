@@ -7,28 +7,41 @@ on:
     branches: [main]
   workflow_dispatch:
 
+env:
+  VCPKG_BINARY_SOURCES: "clear;x-gha,readwrite"
+
 jobs:
   build-windows:
     runs-on: windows-latest
     strategy:
+      fail-fast: false
       matrix:
         arch: [x64, x86]
 
     steps:
       - uses: actions/checkout@v4
 
+      - name: Export GitHub Actions cache variables
+        uses: actions/github-script@v7
+        with:
+          script: |
+            core.exportVariable('ACTIONS_CACHE_URL', process.env.ACTIONS_CACHE_URL || '');
+            core.exportVariable('ACTIONS_RUNTIME_TOKEN', process.env.ACTIONS_RUNTIME_TOKEN || '');
+
       - name: Setup MSVC
         uses: microsoft/setup-msbuild@v2
 
-      - name: Setup vcpkg
-        uses: lukka/run-vcpkg@v11
-        with:
-          runVcpkgInstall: false
+      - name: Clone vcpkg
+        run: git clone https://github.com/microsoft/vcpkg.git
+
+      - name: Bootstrap vcpkg
+        run: .\vcpkg\bootstrap-vcpkg.bat
+        shell: cmd
 
       - name: Install dependencies
         run: |
-          vcpkg install protobuf:${{ matrix.arch }}-windows-static
-          vcpkg install nlohmann-json:${{ matrix.arch }}-windows-static
+          .\vcpkg\vcpkg install protobuf:${{ matrix.arch }}-windows-static
+          .\vcpkg\vcpkg install nlohmann-json:${{ matrix.arch }}-windows-static
 
       - name: Configure CMake
         run: |
@@ -56,17 +69,28 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Setup vcpkg
-        uses: lukka/run-vcpkg@v11
+      - name: Export GitHub Actions cache variables
+        uses: actions/github-script@v7
         with:
-          runVcpkgInstall: false
+          script: |
+            core.exportVariable('ACTIONS_CACHE_URL', process.env.ACTIONS_CACHE_URL || '');
+            core.exportVariable('ACTIONS_RUNTIME_TOKEN', process.env.ACTIONS_RUNTIME_TOKEN || '');
+
+      - name: Install build tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake build-essential curl zip unzip tar
+
+      - name: Clone vcpkg
+        run: git clone https://github.com/microsoft/vcpkg.git
+
+      - name: Bootstrap vcpkg
+        run: ./vcpkg/bootstrap-vcpkg.sh
 
       - name: Install dependencies
         run: |
-          sudo apt-get update
-          sudo apt-get install -y cmake build-essential
-          vcpkg install protobuf:x64-linux
-          vcpkg install nlohmann-json:x64-linux
+          ./vcpkg/vcpkg install protobuf:x64-linux
+          ./vcpkg/vcpkg install nlohmann-json:x64-linux
 
       - name: Configure CMake
         run: |
@@ -108,7 +132,7 @@ jobs:
           cp -r artifacts/windows-x64/* dist/win64/ 2>/dev/null || echo "No win64 artifacts"
           cp -r artifacts/windows-x86/* dist/win32/ 2>/dev/null || echo "No win32 artifacts"
           cp -r artifacts/linux-64/* dist/linux64/ 2>/dev/null || echo "No linux64 artifacts"
-          ls -la dist/
+          ls -laR dist/
 
       - name: Upload combined package
         uses: actions/upload-artifact@v4
