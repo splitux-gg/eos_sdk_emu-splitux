@@ -22,7 +22,14 @@
 
 #include <network_proto.pb.h>
 
-#define __WINDOWS__ 1
+// Platform detection - use standard compiler macros
+#if defined(WIN64) || defined(_WIN64) || defined(__MINGW64__) || defined(WIN32) || defined(_WIN32) || defined(__MINGW32__)
+    #define __WINDOWS__ 1
+#elif defined(__linux__) || defined(linux)
+    #define __LINUX__ 1
+#elif defined(__APPLE__)
+    #define __APPLE__ 1
+#endif
 
 #if defined(__WINDOWS__)
     #define WIN32_LEAN_AND_MEAN
