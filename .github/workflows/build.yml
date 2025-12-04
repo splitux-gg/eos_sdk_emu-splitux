@@ -3,8 +3,12 @@ name: Build EOS SDK Emulator
 on:
   push:
     branches: [main]
+    tags:
+      - 'v*'
   pull_request:
     branches: [main]
+  schedule:
+    - cron: '0 5 * * *'  # Daily at 5 AM UTC
   workflow_dispatch:
 
 env:
@@ -141,3 +145,72 @@ jobs:
           name: eos-sdk-emu-splitux
           path: dist/
         if: hashFiles('dist/**') != ''
+
+  release:
+    needs: package
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v') || github.event_name == 'schedule'
+
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Get version info
+        id: version
+        run: |
+          if [[ "${{ github.ref }}" == refs/tags/v* ]]; then
+            VERSION="${{ github.ref_name }}"
+            RELEASE_NAME="EOS SDK Emu Splitux ${VERSION}"
+            IS_NIGHTLY="false"
+            PRERELEASE="false"
+          else
+            VERSION="nightly-$(date +%Y%m%d)"
+            RELEASE_NAME="EOS SDK Emu Splitux Nightly ($(date +%Y-%m-%d))"
+            IS_NIGHTLY="true"
+            PRERELEASE="true"
+          fi
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "release_name=$RELEASE_NAME" >> $GITHUB_OUTPUT
+          echo "is_nightly=$IS_NIGHTLY" >> $GITHUB_OUTPUT
+          echo "prerelease=$PRERELEASE" >> $GITHUB_OUTPUT
+
+      - name: Download artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: eos-sdk-emu-splitux
+          path: dist
+
+      - name: Create release archive
+        run: |
+          cd dist
+          zip -r ../eos-sdk-emu-splitux.zip .
+
+      - name: Delete existing nightly release
+        if: steps.version.outputs.is_nightly == 'true'
+        continue-on-error: true
+        run: |
+          gh release delete nightly --yes || true
+          git push --delete origin nightly || true
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          name: ${{ steps.version.outputs.release_name }}
+          tag_name: ${{ steps.version.outputs.is_nightly == 'true' && 'nightly' || github.ref_name }}
+          prerelease: ${{ steps.version.outputs.prerelease }}
+          generate_release_notes: ${{ steps.version.outputs.is_nightly != 'true' }}
+          body: |
+            EOS SDK Emulator for Splitux split-screen gaming.
+
+            **Included binaries:**
+            - `linux64/libEOSSDK-Linux-Shipping.so` - Linux 64-bit
+            - `win64/EOSSDK-Win64-Shipping.dll` - Windows 64-bit
+            - `win32/EOSSDK-Win32-Shipping.dll` - Windows 32-bit
+          files: eos-sdk-emu-splitux.zip
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
