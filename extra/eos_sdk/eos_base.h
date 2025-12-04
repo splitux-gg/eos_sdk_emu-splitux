@@ -110,6 +110,11 @@ typedef int32_t EOS_Bool;
 #define EOS_EXTERN_C
 #endif
 
+// Compatibility: some SDK headers use EXTERN_C instead of EOS_EXTERN_C
+#ifndef EXTERN_C
+#define EXTERN_C EOS_EXTERN_C
+#endif
+
 #define EOS_DECLARE_FUNC(return_type) EOS_EXTERN_C EOS_API return_type EOS_CALL
 #define EOS_DECLARE_CALLBACK(CallbackName, ...) EOS_EXTERN_C typedef void (EOS_CALL * CallbackName)(__VA_ARGS__)
 #define EOS_DECLARE_CALLBACK_RETVALUE(ReturnType, CallbackName, ...) EOS_EXTERN_C typedef ReturnType (EOS_CALL * CallbackName)(__VA_ARGS__)
