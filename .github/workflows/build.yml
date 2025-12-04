@@ -46,6 +46,7 @@ jobs:
       - name: Configure CMake
         run: |
           cmake -B build -S . `
+            -A ${{ matrix.arch == 'x64' && 'x64' || 'Win32' }} `
             -DCMAKE_TOOLCHAIN_FILE="${{ github.workspace }}/vcpkg/scripts/buildsystems/vcpkg.cmake" `
             -DVCPKG_TARGET_TRIPLET=${{ matrix.arch }}-windows-static `
             -D${{ matrix.arch == 'x64' && 'X64' || 'X86' }}=ON `
