@@ -1,7 +1,7 @@
 #CMAKE_TOOLCHAIN_FILE
 
+cmake_minimum_required(VERSION 3.10)
 project(nemirtingas_epic_emu)
-cmake_minimum_required(VERSION 3.0)
 
 # Workaround because cross-compiling with CMake + vcpkg fucks up this variable
 # making the 'find_*' functions/macros somehow fail to find the right arch.
@@ -115,9 +115,11 @@ option(DISABLE_LOG "Disable all logging. Will reduce emu size and will speed it 
 
 option(USE_ZSTD_COMPRESS "Use zstd to compress network messages" OFF)
 
-set(Protobuf_USE_STATIC_LIBS ON)
-include(FindProtobuf)
-find_package(Protobuf CONFIG REQUIRED)
+# Use shared libs on Linux, static on Windows via vcpkg
+if(NOT WIN32)
+  set(Protobuf_USE_STATIC_LIBS OFF)
+endif()
+find_package(Protobuf REQUIRED)
 find_package(Threads REQUIRED)
 
 if(USE_ZSTD_COMPRESS)

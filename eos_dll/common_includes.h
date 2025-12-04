@@ -61,6 +61,11 @@
     #include <limits.h> // PATH_MAX
     #include <unistd.h>
 
+    // Windows socket compatibility
+    #ifndef SOCKET_ERROR
+        #define SOCKET_ERROR (-1)
+    #endif
+
 #else
     #error "unknown arch"
 #endif
