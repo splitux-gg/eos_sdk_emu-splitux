@@ -49,8 +49,12 @@ public:
     };
 
 private:
-    static constexpr uint16_t network_port = 55789;
-    static constexpr uint16_t max_network_port = (network_port + 10);
+    // Configurable port range for this instance (from Settings::listen_port)
+    uint16_t _listen_port;
+    uint16_t _max_listen_port;
+    // Fixed broadcast range - wide enough to cover all instances' ports
+    static constexpr uint16_t broadcast_port_start = 55789;
+    static constexpr uint16_t broadcast_port_end = 55820;  // Supports ~3 instances with 10-port ranges
 
 #if defined(NETWORK_COMPRESS)
     // Performance counters

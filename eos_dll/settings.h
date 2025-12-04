@@ -49,6 +49,7 @@ public:
     bool unlock_dlcs;
     bool enable_overlay;
     bool disable_online_networking;
+    uint16_t listen_port;
 
     ~Settings();
 

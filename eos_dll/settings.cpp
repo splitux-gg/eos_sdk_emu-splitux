@@ -165,6 +165,7 @@ void Settings::load_settings()
     unlock_dlcs               = get_setting(settings, "unlock_dlcs", bool(true));
     enable_overlay            = get_setting(settings, "enable_overlay", bool(true));
     disable_online_networking = get_setting(settings, "disable_online_networking", bool(false));
+    listen_port               = get_setting(settings, "listen_port", uint16_t(55789));
     custom_broadcast          = get_setting(settings, "custom_broadcast", std::string(""));
     savepath                  = get_setting(settings, "savepath", std::string("appdata"));
 
@@ -210,6 +211,7 @@ void Settings::save_settings()
     settings["unlock_dlcs"]               = unlock_dlcs;
     settings["enable_overlay"]            = enable_overlay;
     settings["disable_online_networking"] = disable_online_networking;
+    settings["listen_port"]               = listen_port;
 #ifndef DISABLE_LOG
     settings["log_level"]                 = Log::loglevel_to_str();
 #endif

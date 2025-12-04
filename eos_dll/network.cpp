@@ -24,9 +24,11 @@ using namespace PortableAPI;
 Network::Network():
     _advertise(false),
     _advertise_rate(2000),
-    _tcp_port(0)
+    _tcp_port(0),
+    _listen_port(Settings::Inst().listen_port),
+    _max_listen_port(Settings::Inst().listen_port + 10)
 {
-    //APP_LOG(Log::LogLevel::DEBUG, "");
+    APP_LOG(Log::LogLevel::INFO, "Network using listen_port range: %hu-%hu", _listen_port, _max_listen_port);
 #if defined(NETWORK_COMPRESS)
     max_message_size = 0;
     max_compressed_message_size = 0;
@@ -108,7 +110,7 @@ void Network::start_network()
     uint16_t port;
     addr.set_any_addr();
 
-    for (port = network_port; port < max_network_port; ++port)
+    for (port = _listen_port; port < _max_listen_port; ++port)
     {
         addr.set_port(port);
         try
@@ -120,7 +122,7 @@ void Network::start_network()
         {
         }
     }
-    if (port == max_network_port)
+    if (port == _max_listen_port)
     {
         //APP_LOG(Log::LogLevel::ERR, "Failed to start udp socket");
         _network_task.stop();
@@ -958,7 +960,7 @@ bool Network::SendBroadcast(Network_Message_pb& msg)
 
     if (!Settings::Inst().custom_broadcast.empty()) {
         ipv4_addr addr;
-        for (uint16_t port = network_port; port < max_network_port; ++port) {
+        for (uint16_t port = broadcast_port_start; port < broadcast_port_end; ++port) {
             addr.set_port(port);
             addr.from_string(Settings::Inst().custom_broadcast);
             for (uint16_t addr_lo = 0; addr_lo < 255; ++addr_lo) {
@@ -981,7 +983,7 @@ bool Network::SendBroadcast(Network_Message_pb& msg)
 
     for (auto& brd : broadcasts)
     {
-        for (uint16_t port = network_port; port < max_network_port; ++port)
+        for (uint16_t port = broadcast_port_start; port < broadcast_port_end; ++port)
         {
             brd.set_port(port);
             try
