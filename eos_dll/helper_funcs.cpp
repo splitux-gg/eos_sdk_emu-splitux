@@ -225,6 +225,11 @@ LOCAL_API std::string get_callback_name(int iCallback)
         I_CALLBACK(EOS_Presence_SetPresenceCallbackInfo);
         I_CALLBACK(EOS_Presence_PresenceChangedCallbackInfo);
         I_CALLBACK(EOS_Presence_JoinGameAcceptedCallbackInfo);
+        // RTCData
+        I_CALLBACK(EOS_RTCData_ParticipantUpdatedCallbackInfo);
+        I_CALLBACK(EOS_RTCData_DataReceivedCallbackInfo);
+        I_CALLBACK(EOS_RTCData_UpdateSendingCallbackInfo);
+        I_CALLBACK(EOS_RTCData_UpdateReceivingCallbackInfo);
         // Sessions
         I_CALLBACK(EOS_Sessions_SendInviteCallbackInfo);
         I_CALLBACK(EOS_Sessions_RejectInviteCallbackInfo);

@@ -177,6 +177,107 @@ EOS_DECLARE_FUNC(EOS_HLeaderboards) EOS_Platform_GetLeaderboardsInterface(EOS_HP
     return pInst->GetLeaderboardsInterface();
 }
 
+EOS_DECLARE_FUNC(EOS_HRTC) EOS_Platform_GetRTCInterface(EOS_HPlatform Handle)
+{
+    if (Handle == nullptr)
+        return nullptr;
+
+    auto pInst = reinterpret_cast<EOSSDK_Platform*>(Handle);
+    return pInst->GetRTCInterface();
+}
+
+EOS_DECLARE_FUNC(EOS_HMods) EOS_Platform_GetModsInterface(EOS_HPlatform Handle)
+{
+    TRACE_FUNC();
+    if (Handle == nullptr)
+        return nullptr;
+
+    auto pInst = reinterpret_cast<EOSSDK_Platform*>(Handle);
+    return nullptr;
+}
+
+EOS_DECLARE_FUNC(EOS_HAntiCheatClient) EOS_Platform_GetAntiCheatClientInterface(EOS_HPlatform Handle) {
+    TRACE_FUNC();
+    if (Handle == nullptr)
+        return nullptr;
+
+    auto pInst = reinterpret_cast<EOSSDK_Platform*>(Handle);
+    return nullptr;
+}
+
+EOS_DECLARE_FUNC(EOS_HAntiCheatServer) EOS_Platform_GetAntiCheatServerInterface(EOS_HPlatform Handle) {
+    TRACE_FUNC();
+    if (Handle == nullptr)
+        return nullptr;
+
+    auto pInst = reinterpret_cast<EOSSDK_Platform*>(Handle);
+    return nullptr;
+}
+
+EOS_DECLARE_FUNC(EOS_HProgressionSnapshot) EOS_Platform_GetProgressionSnapshotInterface(EOS_HPlatform Handle) {
+    TRACE_FUNC();
+    if (Handle == nullptr)
+        return nullptr;
+
+    auto pInst = reinterpret_cast<EOSSDK_Platform*>(Handle);
+    return nullptr;
+}
+
+EOS_DECLARE_FUNC(EOS_HReports) EOS_Platform_GetReportsInterface(EOS_HPlatform Handle) {
+    TRACE_FUNC();
+    if (Handle == nullptr)
+        return nullptr;
+
+    auto pInst = reinterpret_cast<EOSSDK_Platform*>(Handle);
+    return nullptr;
+}
+
+EOS_DECLARE_FUNC(EOS_HSanctions) EOS_Platform_GetSanctionsInterface(EOS_HPlatform Handle) {
+    TRACE_FUNC();
+    if (Handle == nullptr)
+        return nullptr;
+
+    auto pInst = reinterpret_cast<EOSSDK_Platform*>(Handle);
+    return nullptr;
+}
+
+EOS_DECLARE_FUNC(EOS_HKWS) EOS_Platform_GetKWSInterface(EOS_HPlatform Handle) {
+    TRACE_FUNC();
+    if (Handle == nullptr)
+        return nullptr;
+
+    auto pInst = reinterpret_cast<EOSSDK_Platform*>(Handle);
+    return nullptr;
+}
+
+EOS_DECLARE_FUNC(EOS_HCustomInvites) EOS_Platform_GetCustomInvitesInterface(EOS_HPlatform Handle) {
+    TRACE_FUNC();
+    if (Handle == nullptr)
+        return nullptr;
+
+    auto pInst = reinterpret_cast<EOSSDK_Platform*>(Handle);
+    return nullptr;
+}
+
+EOS_DECLARE_FUNC(EOS_HIntegratedPlatform) EOS_Platform_GetIntegratedPlatformInterface(EOS_HPlatform Handle) {
+    TRACE_FUNC();
+    if (Handle == nullptr)
+        return nullptr;
+
+    auto pInst = reinterpret_cast<EOSSDK_Platform*>(Handle);
+    return nullptr;
+}
+
+
+EOS_DECLARE_FUNC(EOS_HRTCAdmin) EOS_Platform_GetRTCAdminInterface(EOS_HPlatform Handle)
+{
+    if (Handle == nullptr)
+        return nullptr;
+
+    auto pInst = reinterpret_cast<EOSSDK_Platform*>(Handle);
+    return pInst->GetRTCAdminInterface();
+}
+
 EOS_DECLARE_FUNC(EOS_EResult) EOS_Platform_GetActiveCountryCode(EOS_HPlatform Handle, EOS_EpicAccountId LocalUserId, char* OutBuffer, int32_t* InOutBufferLength)
 {
     if (Handle == nullptr)
@@ -239,6 +340,63 @@ EOS_DECLARE_FUNC(EOS_EResult) EOS_Platform_CheckForLauncherAndRestart(EOS_HPlatf
     auto pInst = reinterpret_cast<EOSSDK_Platform*>(Handle);
     return pInst->CheckForLauncherAndRestart();
 }
+
+EOS_DECLARE_FUNC(EOS_EResult) EOS_Platform_GetDesktopCrossplayStatus(EOS_HPlatform Handle, const EOS_Platform_GetDesktopCrossplayStatusOptions* Options, EOS_Platform_DesktopCrossplayStatusInfo* OutDesktopCrossplayStatusInfo){
+    TRACE_FUNC();
+    if (Handle == nullptr)
+        return EOS_EResult::EOS_InvalidParameters;
+
+    auto pInst = reinterpret_cast<EOSSDK_Platform*>(Handle);
+    return pInst->GetDesktopCrossplayStatus(Options, OutDesktopCrossplayStatusInfo);
+}
+
+EOS_DECLARE_FUNC(EOS_EResult) EOS_Platform_SetApplicationStatus(EOS_HPlatform Handle, const EOS_EApplicationStatus NewStatus) {
+    if (Handle == nullptr)
+        return EOS_EResult::EOS_InvalidParameters;
+
+    auto pInst = reinterpret_cast<EOSSDK_Platform*>(Handle);
+    return pInst->SetApplicationStatus(NewStatus);
+}
+
+EOS_DECLARE_FUNC(EOS_EApplicationStatus) EOS_Platform_GetApplicationStatus(EOS_HPlatform Handle) {
+    TRACE_FUNC();
+    if (Handle == nullptr)
+        return EOS_EApplicationStatus::EOS_AS_Foreground;
+
+    auto pInst = reinterpret_cast<EOSSDK_Platform*>(Handle);
+    return pInst->GetApplicationStatus();
+}
+
+EOS_DECLARE_FUNC(const char*) EOS_EApplicationStatus_ToString(EOS_EApplicationStatus ApplicationStatus) {
+    TRACE_FUNC();
+    switch (ApplicationStatus) {
+        case EOS_EApplicationStatus::EOS_AS_BackgroundConstrained: return "EOS_AS_BackgroundConstrained";
+        case EOS_EApplicationStatus::EOS_AS_BackgroundUnconstrained: return "EOS_AS_BackgroundUnconstrained";
+        case EOS_EApplicationStatus::EOS_AS_BackgroundSuspended: return "EOS_AS_BackgroundSuspended";
+        case EOS_EApplicationStatus::EOS_AS_Foreground: return "EOS_AS_Foreground";
+        default: return "EOS_AS_Foreground";
+    }
+}
+
+EOS_DECLARE_FUNC(EOS_EResult) EOS_Platform_SetNetworkStatus(EOS_HPlatform Handle, const EOS_ENetworkStatus NewStatus) {
+    if (Handle == nullptr)
+        return EOS_EResult::EOS_InvalidParameters;
+
+    auto pInst = reinterpret_cast<EOSSDK_Platform*>(Handle);
+    return pInst->SetNetworkStatus(NewStatus);
+}
+
+EOS_DECLARE_FUNC(EOS_ENetworkStatus) EOS_Platform_GetNetworkStatus(EOS_HPlatform Handle)
+{
+    TRACE_FUNC();
+    if (Handle == nullptr)
+        return EOS_ENetworkStatus::EOS_NS_Disabled;
+
+    auto pInst = reinterpret_cast<EOSSDK_Platform*>(Handle);
+    return pInst->GetNetworkStatus();
+}
+
+
 
 /////////////////////////////////////////////////////////
 // platform

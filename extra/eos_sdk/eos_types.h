@@ -6,6 +6,7 @@
 
 #define EOS_Platform_Options    EOS_Platform_Options014
 #define EOS_Platform_RTCOptions EOS_Platform_RTCOptions002
+#define EOS_Platform_GetDesktopCrossplayStatusOptions EOS_Platform_GetDesktopCrossplayStatusOptions001
 
 #include "eos_types1.16.4.h"
 #include "eos_types1.13.1.h"
@@ -24,4 +25,5 @@ using EOS_Platform_Options013 = EOS_Platform_Options014;
 #define EOS_PLATFORM_OPTIONS_API_012 12
 using EOS_Platform_Options012 = EOS_Platform_Options013;
 
-#define EOS_PLATFORM_OPTIONS_API_LATEST    EOS_PLATFORM_OPTIONS_API_0014
+#define EOS_PLATFORM_OPTIONS_API_LATEST					  EOS_PLATFORM_OPTIONS_API_0014
+#define EOS_PLATFORM_GETDESKTOPCROSSPLAYSTATUS_API_LATEST EOS_PLATFORM_GETDESKTOPCROSSPLAYSTATUS_API_001

@@ -43,7 +43,9 @@ EOSSDK_Platform::EOSSDK_Platform():
     _playerdatastorage(nullptr),
     _achievements     (nullptr),
     _stats            (nullptr),
-    _leaderboards     (nullptr)
+    _leaderboards     (nullptr),
+    _rtc              (nullptr),
+    _rtc_admin        (nullptr)
 {
     _cb_manager        = new Callback_Manager;
     _network           = new Network;
@@ -177,6 +179,8 @@ void EOSSDK_Platform::Init(const EOS_Platform_Options* Options)
         _stats             = new EOSSDK_Stats;
         _titlestorage      = new EOSSDK_TitleStorage;
         _leaderboards      = new EOSSDK_Leaderboards;
+        _rtc               = new EOSSDK_RTC;
+        _rtc_admin         = new EOSSDK_RTCAdmin;
 
         _presence->setup_myself();
         _userinfo->setup_myself();
@@ -207,6 +211,8 @@ void EOSSDK_Platform::Release()
         delete _connect;
         delete _auth;
         delete _metrics;
+        delete _rtc;
+        delete _rtc_admin;
 
         _platform_init = false;
     }
@@ -433,6 +439,32 @@ EOS_HLeaderboards      EOSSDK_Platform::GetLeaderboardsInterface()
 }
 
 /**
+ * Get a handle to the RTC Interface.
+ * @return EOS_HRTC handle
+ *
+ * @see eos_rtc.h
+ * @see eos_rtc_types.h
+ */
+EOS_HRTC      EOSSDK_Platform::GetRTCInterface()
+{
+    GLOBAL_LOCK();
+    return reinterpret_cast<EOS_HRTC>(_rtc);
+}
+
+/**
+ * Get a handle to the RTC Admin Interface.
+ * @return EOS_HRTC handle
+ *
+ * @see eos_rtc_admin.h
+ * @see eos_rtc_admin_types.h
+ */
+EOS_HRTCAdmin      EOSSDK_Platform::GetRTCAdminInterface()
+{
+    GLOBAL_LOCK();
+    return reinterpret_cast<EOS_HRTCAdmin>(_rtc_admin);
+}
+
+/**
  * Get the active country code that the SDK will send to services which require it.
  * This only will return the value set as the override otherwise EOS_NotFound is returned.
  * This is not currently used for anything internally.
@@ -637,5 +669,96 @@ EOS_EResult EOSSDK_Platform::CheckForLauncherAndRestart()
 
     return EOS_EResult::EOS_NoChange;
 }
+
+/**
+ * Windows only.
+ * Checks that the application is ready to use desktop crossplay functionality, with the necessary prerequisites having been met.
+ *
+ * This function verifies that the application was launched through the Bootstrapper application,
+ * the redistributable service has been installed and is running in the background,
+ * and that the overlay has been loaded successfully.
+ *
+ * On Windows, the desktop crossplay functionality is required to use Epic accounts login
+ * with applications that are distributed outside the Epic Games Store.
+ *
+ * @param Options input structure that specifies the API version.
+ * @param OutDesktopCrossplayStatusInfo output structure to receive the desktop crossplay status information.
+ *
+ * @return An EOS_EResult is returned to indicate success or an error.
+ *		   EOS_NotImplemented is returned on non-Windows platforms.
+ */
+EOS_EResult EOSSDK_Platform::GetDesktopCrossplayStatus(const EOS_Platform_GetDesktopCrossplayStatusOptions* Options, EOS_Platform_DesktopCrossplayStatusInfo* OutDesktopCrossplayStatusInfo)
+{
+    TRACE_FUNC();
+
+    //TODO: Implement crossplay status
+
+    return EOS_EResult::EOS_NotImplemented;
+}
+
+
+/**
+ * Notify a change in application state.
+ *
+ * @note Calling SetApplicationStatus must happen before Tick when foregrounding for the cases where we won't get the background notification.
+ *
+ * @param NewStatus The new status for the application.
+ *
+ * @return An EOS_EResult that indicates whether we changed the application status successfully.
+ *         EOS_Success if the application was changed successfully.
+ *         EOS_InvalidParameters if the value of NewStatus is invalid.
+ *         EOS_NotImplemented if EOS_AS_BackgroundConstrained or EOS_AS_BackgroundUnconstrained are attempted to be set on platforms that do not have such application states.
+ */
+EOS_EResult EOSSDK_Platform::SetApplicationStatus(const EOS_EApplicationStatus NewStatus) {
+    TRACE_FUNC();
+
+    _application_status = NewStatus;
+
+    return EOS_EResult::EOS_Success;
+}
+
+/**
+ * Retrieves the current application state as told to the SDK by the application.
+ *
+ * @return The current application status.
+ */
+EOS_EApplicationStatus EOSSDK_Platform::GetApplicationStatus() {
+    TRACE_FUNC();
+
+    return _application_status;
+}
+
+
+/**
+ * Notify a change in network state.
+ *
+ * @param NewStatus The new network status.
+ *
+ * @return An EOS_EResult that indicates whether we changed the network status successfully.
+ *         EOS_Success if the network was changed successfully.
+ *         EOS_InvalidParameters if the value of NewStatus is invalid.
+ */
+
+EOS_EResult EOSSDK_Platform::SetNetworkStatus(const EOS_ENetworkStatus NewStatus)
+{
+    TRACE_FUNC();
+
+    _network_status = NewStatus;
+
+    return EOS_EResult::EOS_Success;
+}
+
+/**
+ * Retrieves the current network state as told to the SDK by the application.
+ *
+ * @return The current network status.
+ */
+
+EOS_ENetworkStatus EOSSDK_Platform::GetNetworkStatus() {
+    TRACE_FUNC();
+
+    return _network_status;
+}
+
 
 }

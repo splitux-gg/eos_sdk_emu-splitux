@@ -40,6 +40,8 @@
 #include "eossdk_stats.h"
 #include "eossdk_titlestorage.h"
 #include "eossdk_leaderboards.h"
+#include "eossdk_rtc.h"
+#include "eossdk_rtc_admin.h"
 
 namespace sdk
 {
@@ -64,6 +66,8 @@ namespace sdk
         uint64_t    _flags;
         std::string _cache_directory;
         uint32_t    _ticket_budget_in_milliseconds;
+        EOS_ENetworkStatus _network_status;
+        EOS_EApplicationStatus _application_status;
 
         Callback_Manager      *_cb_manager;
         Network               *_network;
@@ -84,6 +88,8 @@ namespace sdk
         EOSSDK_Stats             *_stats;
         EOSSDK_TitleStorage      *_titlestorage;
         EOSSDK_Leaderboards      *_leaderboards;
+        EOSSDK_RTC               * _rtc;
+        EOSSDK_RTCAdmin          * _rtc_admin;
 
         ~EOSSDK_Platform();
 
@@ -108,6 +114,8 @@ namespace sdk
         EOS_HAchievements      GetAchievementsInterface();
         EOS_HStats             GetStatsInterface();
         EOS_HLeaderboards      GetLeaderboardsInterface();
+        EOS_HRTC               GetRTCInterface();
+        EOS_HRTCAdmin          GetRTCAdminInterface();
 
         EOS_EResult GetActiveCountryCode(EOS_EpicAccountId LocalUserId, char* OutBuffer, int32_t* InOutBufferLength);
         EOS_EResult GetActiveLocaleCode(EOS_EpicAccountId LocalUserId, char* OutBuffer, int32_t* InOutBufferLength);
@@ -116,6 +124,11 @@ namespace sdk
         EOS_EResult SetOverrideCountryCode(const char* NewCountryCode);
         EOS_EResult SetOverrideLocaleCode(const char* NewLocaleCode);
         EOS_EResult CheckForLauncherAndRestart();
+        EOS_EResult GetDesktopCrossplayStatus(const EOS_Platform_GetDesktopCrossplayStatusOptions* Options, EOS_Platform_DesktopCrossplayStatusInfo* OutDesktopCrossplayStatusInfo);
+        EOS_EResult SetApplicationStatus(const EOS_EApplicationStatus NewStatus);
+        EOS_EApplicationStatus GetApplicationStatus();
+        EOS_EResult SetNetworkStatus(const EOS_ENetworkStatus NewStatus);
+        EOS_ENetworkStatus GetNetworkStatus();
     };
 }
 
@@ -139,3 +152,5 @@ inline sdk::EOSSDK_PlayerDataStorage& GetEOS_PlayerDataStorage() { return *GetEO
 inline sdk::EOSSDK_Achievements&      GetEOS_Achievements     () { return *GetEOS_Platform()._achievements;      }
 inline sdk::EOSSDK_Stats&             GetEOS_Stats            () { return *GetEOS_Platform()._stats;             }
 inline sdk::EOSSDK_Leaderboards&      GetEOS_Leaderboards     () { return *GetEOS_Platform()._leaderboards;      }
+inline sdk::EOSSDK_RTC&               GetEOS_RTC              () { return *GetEOS_Platform()._rtc;               }
+inline sdk::EOSSDK_RTCAdmin&          GetEOS_RTCAdmin         () { return *GetEOS_Platform()._rtc_admin;         }

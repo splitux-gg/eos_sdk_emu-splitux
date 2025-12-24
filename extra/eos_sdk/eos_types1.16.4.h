@@ -290,7 +290,7 @@ EOS_STRUCT(EOS_Platform_GetDesktopCrossplayStatusOptions001, (
 /**
  * Output parameters for the EOS_Platform_GetDesktopCrossplayStatus function.
  */
-EOS_STRUCT(EOS_Platform_DesktopCrossplayStatusInfo001, (
+EOS_STRUCT(EOS_Platform_DesktopCrossplayStatusInfo, (
 	/**
 	 * Status for the availability of desktop crossplay functionality.
 	 *

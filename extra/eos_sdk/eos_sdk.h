@@ -25,9 +25,11 @@
 #include "eos_sanctions_types.h"
 #include "eos_kws_types.h"
 #include "eos_rtc_types.h"
+#include "eos_rtc_data_types.h"
 #include "eos_rtc_admin_types.h"
 #include "eos_progressionsnapshot_types.h"
 #include "eos_custominvites_types.h"
+#include "eos_integratedplatform_types.h"
 
 /**
  * The Platform Instance is used to gain access to all other Epic Online Service interfaces and to drive internal operations through the Tick.
@@ -41,10 +43,10 @@
  * @see EOS_Shutdown
  */
 
-/**
- * Notify the platform instance to do work. This function must be called frequently in order for the services provided by the SDK to properly
- * function. For tick-based applications, it is usually desireable to call this once per-tick.
- */
+ /**
+  * Notify the platform instance to do work. This function must be called frequently in order for the services provided by the SDK to properly
+  * function. For tick-based applications, it is usually desirable to call this once per-tick.
+  */
 EOS_DECLARE_FUNC(void) EOS_Platform_Tick(EOS_HPlatform Handle);
 
 /**
@@ -287,7 +289,15 @@ EOS_DECLARE_FUNC(EOS_HKWS) EOS_Platform_GetKWSInterface(EOS_HPlatform Handle);
 EOS_DECLARE_FUNC(EOS_HCustomInvites) EOS_Platform_GetCustomInvitesInterface(EOS_HPlatform Handle);
 
 /**
- * Get the active country code that the SDK will send to services which require it.
+ * Get a handle to the Integrated Platform Interface.
+ * @return EOS_HIntegratedPlatform handle
+ *
+ * @see eos_integratedplatform.h
+ * @see eos_integratedplatform_types.h
+ */
+EOS_DECLARE_FUNC(EOS_HIntegratedPlatform) EOS_Platform_GetIntegratedPlatformInterface(EOS_HPlatform Handle);
+
+/**
  * This only will return the value set as the override otherwise EOS_NotFound is returned.
  * This is not currently used for anything internally.
  *
@@ -300,7 +310,7 @@ EOS_DECLARE_FUNC(EOS_HCustomInvites) EOS_Platform_GetCustomInvitesInterface(EOS_
  * @return An EOS_EResult that indicates whether the active country code string was copied into the OutBuffer.
  *         EOS_Success if the information is available and passed out in OutBuffer
  *         EOS_InvalidParameters if you pass a null pointer for the out parameter
- *         EOS_NotFound if there is neither an override nor an available country code for the user.
+ *         EOS_NotFound if there is not an override country code for the user.
  *         EOS_LimitExceeded - The OutBuffer is not large enough to receive the country code string. InOutBufferLength contains the required minimum length to perform the operation successfully.
  *
  * @see eos_ecom.h
@@ -314,7 +324,7 @@ EOS_DECLARE_FUNC(EOS_EResult) EOS_Platform_GetActiveCountryCode(EOS_HPlatform Ha
  * This is used for localization. This follows ISO 639.
  *
  * @param LocalUserId The account to use for lookup if no override exists.
- * @param OutBuffer The buffer into which the character data should be written.  The buffer must be long enough to hold a string of EOS_LOCALECODE_MAX_LEN.
+ * @param OutBuffer The buffer into which the character data should be written.  The buffer must be long enough to hold a string of EOS_LOCALECODE_MAX_LENGTH.
  * @param InOutBufferLength The size of the OutBuffer in characters.
  *                          The input buffer should include enough space to be null-terminated.
  *                          When the function returns, this parameter will be filled with the length of the string copied into OutBuffer.
@@ -326,13 +336,13 @@ EOS_DECLARE_FUNC(EOS_EResult) EOS_Platform_GetActiveCountryCode(EOS_HPlatform Ha
  *         EOS_LimitExceeded - The OutBuffer is not large enough to receive the locale code string. InOutBufferLength contains the required minimum length to perform the operation successfully.
  *
  * @see eos_ecom.h
- * @see EOS_LOCALECODE_MAX_LEN
+ * @see EOS_LOCALECODE_MAX_LENGTH
  */
 EOS_DECLARE_FUNC(EOS_EResult) EOS_Platform_GetActiveLocaleCode(EOS_HPlatform Handle, EOS_EpicAccountId LocalUserId, char* OutBuffer, int32_t* InOutBufferLength);
 
 /**
  * Get the override country code that the SDK will send to services which require it.
- * This is currently used for determining pricing.
+ * This is not currently used for anything internally.
  *
  * @param OutBuffer The buffer into which the character data should be written.  The buffer must be long enough to hold a string of EOS_COUNTRYCODE_MAX_LENGTH.
  * @param InOutBufferLength The size of the OutBuffer in characters.
@@ -353,7 +363,7 @@ EOS_DECLARE_FUNC(EOS_EResult) EOS_Platform_GetOverrideCountryCode(EOS_HPlatform 
  * Get the override locale code that the SDK will send to services which require it.
  * This is used for localization. This follows ISO 639.
  *
- * @param OutBuffer The buffer into which the character data should be written.  The buffer must be long enough to hold a string of EOS_LOCALECODE_MAX_LEN.
+ * @param OutBuffer The buffer into which the character data should be written.  The buffer must be long enough to hold a string of EOS_LOCALECODE_MAX_LENGTH.
  * @param InOutBufferLength The size of the OutBuffer in characters.
  *                          The input buffer should include enough space to be null-terminated.
  *                          When the function returns, this parameter will be filled with the length of the string copied into OutBuffer.
@@ -364,13 +374,13 @@ EOS_DECLARE_FUNC(EOS_EResult) EOS_Platform_GetOverrideCountryCode(EOS_HPlatform 
  *         EOS_LimitExceeded - The OutBuffer is not large enough to receive the locale code string. InOutBufferLength contains the required minimum length to perform the operation successfully.
  *
  * @see eos_ecom.h
- * @see EOS_LOCALECODE_MAX_LEN
+ * @see EOS_LOCALECODE_MAX_LENGTH
  */
 EOS_DECLARE_FUNC(EOS_EResult) EOS_Platform_GetOverrideLocaleCode(EOS_HPlatform Handle, char* OutBuffer, int32_t* InOutBufferLength);
 
 /**
  * Set the override country code that the SDK will send to services which require it.
- * This is currently used for determining accurate pricing.
+ * This is not currently used for anything internally.
  *
  * @return An EOS_EResult that indicates whether the override country code string was saved.
  *         EOS_Success if the country code was overridden
@@ -390,12 +400,19 @@ EOS_DECLARE_FUNC(EOS_EResult) EOS_Platform_SetOverrideCountryCode(EOS_HPlatform 
  *         EOS_InvalidParameters if you pass an invalid locale code
  *
  * @see eos_ecom.h
- * @see EOS_LOCALECODE_MAX_LEN
+ * @see EOS_LOCALECODE_MAX_LENGTH
  */
 EOS_DECLARE_FUNC(EOS_EResult) EOS_Platform_SetOverrideLocaleCode(EOS_HPlatform Handle, const char* NewLocaleCode);
 
 /**
- * Checks if the app was launched through the Epic Launcher, and relaunches it through the Epic Launcher if it wasn't.
+ * Checks if the app was launched through the Epic Games Launcher, and relaunches it through the Epic Games Launcher if it wasn't.
+ *
+ * NOTE: During the call to EOS_Platform_Create, the command line that was used to launch the app is inspected, and if it is
+ * recognized as coming from the Epic Games Launcher, an environment variable is set to 1. The name of the environment variable
+ * is defined by EOS_PLATFORM_CHECKFORLAUNCHERANDRESTART_ENV_VAR.
+ *
+ * You can force the EOS_Platform_CheckForLauncherAndRestart API to relaunch the title by
+ * explicitly unsetting this environment variable before calling EOS_Platform_CheckForLauncherAndRestart.
  *
  * @return An EOS_EResult is returned to indicate success or an error.
  *
@@ -404,3 +421,61 @@ EOS_DECLARE_FUNC(EOS_EResult) EOS_Platform_SetOverrideLocaleCode(EOS_HPlatform H
  * EOS_UnexpectedError is returned if the LauncherCheck module failed to initialize, or the module tried and failed to restart the app.
  */
 EOS_DECLARE_FUNC(EOS_EResult) EOS_Platform_CheckForLauncherAndRestart(EOS_HPlatform Handle);
+
+/**
+ * Windows only.
+ * Checks that the application is ready to use desktop crossplay functionality, with the necessary prerequisites having been met.
+ *
+ * This function verifies that the application was launched through the Bootstrapper application,
+ * the redistributable service has been installed and is running in the background,
+ * and that the overlay has been loaded successfully.
+ *
+ * On Windows, the desktop crossplay functionality is required to use Epic accounts login
+ * with applications that are distributed outside the Epic Games Store.
+ *
+ * @param Options input structure that specifies the API version.
+ * @param OutDesktopCrossplayStatusInfo output structure to receive the desktop crossplay status information.
+ *
+ * @return An EOS_EResult is returned to indicate success or an error.
+ *		   EOS_NotImplemented is returned on non-Windows platforms.
+ */
+EOS_DECLARE_FUNC(EOS_EResult) EOS_Platform_GetDesktopCrossplayStatus(EOS_HPlatform Handle, const EOS_Platform_GetDesktopCrossplayStatusOptions* Options, EOS_Platform_DesktopCrossplayStatusInfo* OutDesktopCrossplayStatusInfo);
+
+/**
+ * Notify a change in application state.
+ *
+ * @note Calling SetApplicationStatus must happen before Tick when foregrounding for the cases where we won't get the background notification.
+ *
+ * @param NewStatus The new status for the application.
+ *
+ * @return An EOS_EResult that indicates whether we changed the application status successfully.
+ *         EOS_Success if the application was changed successfully.
+ *         EOS_InvalidParameters if the value of NewStatus is invalid.
+ *         EOS_NotImplemented if EOS_AS_BackgroundConstrained or EOS_AS_BackgroundUnconstrained are attempted to be set on platforms that do not have such application states.
+ */
+EOS_DECLARE_FUNC(EOS_EResult) EOS_Platform_SetApplicationStatus(EOS_HPlatform Handle, const EOS_EApplicationStatus NewStatus);
+
+/**
+ * Retrieves the current application state as told to the SDK by the application.
+ *
+ * @return The current application status.
+ */
+EOS_DECLARE_FUNC(EOS_EApplicationStatus) EOS_Platform_GetApplicationStatus(EOS_HPlatform Handle);
+
+/**
+ * Notify a change in network state.
+ *
+ * @param NewStatus The new network status.
+ *
+ * @return An EOS_EResult that indicates whether we changed the network status successfully.
+ *         EOS_Success if the network was changed successfully.
+ *         EOS_InvalidParameters if the value of NewStatus is invalid.
+ */
+EOS_DECLARE_FUNC(EOS_EResult) EOS_Platform_SetNetworkStatus(EOS_HPlatform Handle, const EOS_ENetworkStatus NewStatus);
+
+/**
+ * Retrieves the current network state as told to the SDK by the application.
+ *
+ * @return The current network status.
+ */
+EOS_DECLARE_FUNC(EOS_ENetworkStatus) EOS_Platform_GetNetworkStatus(EOS_HPlatform Handle);
