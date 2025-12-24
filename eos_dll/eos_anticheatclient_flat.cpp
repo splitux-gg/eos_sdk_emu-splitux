@@ -22,6 +22,15 @@
 
 #include "common_includes.h"
 
+// Forward declarations for types that may not exist in all SDK versions
+#ifndef EOS_ANTICHEATCLIENT_ADDNOTIFYCLIENTINTEGRITYVIOLATED_API_LATEST
+#define EOS_ANTICHEATCLIENT_ADDNOTIFYCLIENTINTEGRITYVIOLATED_API_LATEST 1
+EOS_STRUCT(EOS_AntiCheatClient_AddNotifyClientIntegrityViolatedOptions, (
+    int32_t ApiVersion;
+));
+typedef void (EOS_CALL* EOS_AntiCheatClient_OnClientIntegrityViolatedCallback)(const void* Data);
+#endif
+
 EOS_DECLARE_FUNC(EOS_NotificationId) EOS_AntiCheatClient_AddNotifyMessageToServer(EOS_HAntiCheatClient Handle, const EOS_AntiCheatClient_AddNotifyMessageToServerOptions* Options, void* ClientData, EOS_AntiCheatClient_OnMessageToServerCallback NotificationFn)
 {
     return EOS_INVALID_NOTIFICATIONID;
