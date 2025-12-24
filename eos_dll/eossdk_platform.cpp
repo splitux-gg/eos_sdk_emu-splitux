@@ -74,11 +74,12 @@ void EOSSDK_Platform::Init(const EOS_Platform_Options* Options)
             _api_version = Options->ApiVersion;
             switch (Options->ApiVersion)
             {
-                case EOS_PLATFORM_OPTIONS_API_014: 
+                case EOS_PLATFORM_OPTIONS_API_014:
                 {
                     auto pf = reinterpret_cast<const EOS_Platform_Options014*>(Options);
-                    APP_LOG(Log::LogLevel::DEBUG, "IntegratedPlatformOptionsContainerHandle = '%s'", pf->IntegratedPlatformOptionsContainerHandle);
-                    APP_LOG(Log::LogLevel::DEBUG, "OverrideLocaleCode = '%d'", *pf->TaskNetworkTimeoutSeconds);
+                    APP_LOG(Log::LogLevel::DEBUG, "IntegratedPlatformOptionsContainerHandle = %p", pf->IntegratedPlatformOptionsContainerHandle);
+                    if (pf->TaskNetworkTimeoutSeconds != nullptr)
+                        APP_LOG(Log::LogLevel::DEBUG, "TaskNetworkTimeoutSeconds = %f", *pf->TaskNetworkTimeoutSeconds);
                     APP_LOG(Log::LogLevel::DEBUG, "DeploymentId = '%s'", _deployment_id.c_str());
                 }
                 case EOS_PLATFORM_OPTIONS_API_013:
