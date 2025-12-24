@@ -22,6 +22,214 @@
 
 #include "common_includes.h"
 
+// Include RTCAudio types (not included by default in eos_sdk.h)
+#include <eos_rtc_audio.h>
+
+// Forward declarations for types not in SDK headers that are needed for newer SDK versions
+// These types may be added in future SDK versions but we need stubs now
+
+// RTCAudio additional types (SDK 1.16+)
+#ifndef EOS_RTCAUDIO_UPDATESENDINGVOLUME_API_LATEST
+#define EOS_RTCAUDIO_UPDATESENDINGVOLUME_API_LATEST 1
+EOS_STRUCT(EOS_RTCAudio_UpdateSendingVolumeOptions, (
+    int32_t ApiVersion;
+    EOS_ProductUserId LocalUserId;
+    const char* RoomName;
+    float Volume;
+));
+typedef struct EOS_RTCAudio_UpdateSendingVolumeCallbackInfoInternal {
+    EOS_EResult ResultCode;
+    void* ClientData;
+    EOS_ProductUserId LocalUserId;
+    const char* RoomName;
+} EOS_RTCAudio_UpdateSendingVolumeCallbackInfo;
+typedef void (EOS_CALL* EOS_RTCAudio_OnUpdateSendingVolumeCallback)(const EOS_RTCAudio_UpdateSendingVolumeCallbackInfo* Data);
+#endif
+
+#ifndef EOS_RTCAUDIO_UPDATERECEIVINGVOLUME_API_LATEST
+#define EOS_RTCAUDIO_UPDATERECEIVINGVOLUME_API_LATEST 1
+EOS_STRUCT(EOS_RTCAudio_UpdateReceivingVolumeOptions, (
+    int32_t ApiVersion;
+    EOS_ProductUserId LocalUserId;
+    const char* RoomName;
+    float Volume;
+));
+typedef struct EOS_RTCAudio_UpdateReceivingVolumeCallbackInfoInternal {
+    EOS_EResult ResultCode;
+    void* ClientData;
+    EOS_ProductUserId LocalUserId;
+    const char* RoomName;
+} EOS_RTCAudio_UpdateReceivingVolumeCallbackInfo;
+typedef void (EOS_CALL* EOS_RTCAudio_OnUpdateReceivingVolumeCallback)(const EOS_RTCAudio_UpdateReceivingVolumeCallbackInfo* Data);
+#endif
+
+#ifndef EOS_RTCAUDIO_UPDATEPARTICIPANTVOLUME_API_LATEST
+#define EOS_RTCAUDIO_UPDATEPARTICIPANTVOLUME_API_LATEST 1
+EOS_STRUCT(EOS_RTCAudio_UpdateParticipantVolumeOptions, (
+    int32_t ApiVersion;
+    EOS_ProductUserId LocalUserId;
+    const char* RoomName;
+    EOS_ProductUserId ParticipantId;
+    float Volume;
+));
+typedef struct EOS_RTCAudio_UpdateParticipantVolumeCallbackInfoInternal {
+    EOS_EResult ResultCode;
+    void* ClientData;
+    EOS_ProductUserId LocalUserId;
+    const char* RoomName;
+    EOS_ProductUserId ParticipantId;
+} EOS_RTCAudio_UpdateParticipantVolumeCallbackInfo;
+typedef void (EOS_CALL* EOS_RTCAudio_OnUpdateParticipantVolumeCallback)(const EOS_RTCAudio_UpdateParticipantVolumeCallbackInfo* Data);
+#endif
+
+#ifndef EOS_RTCAUDIO_SETINPUTDEVICESETTINGS_API_LATEST
+#define EOS_RTCAUDIO_SETINPUTDEVICESETTINGS_API_LATEST 1
+EOS_STRUCT(EOS_RTCAudio_SetInputDeviceSettingsOptions, (
+    int32_t ApiVersion;
+    EOS_ProductUserId LocalUserId;
+    const char* RealDeviceId;
+    EOS_Bool bPlatformAEC;
+));
+#endif
+
+#ifndef EOS_RTCAUDIO_SETOUTPUTDEVICESETTINGS_API_LATEST
+#define EOS_RTCAUDIO_SETOUTPUTDEVICESETTINGS_API_LATEST 1
+EOS_STRUCT(EOS_RTCAudio_SetOutputDeviceSettingsOptions, (
+    int32_t ApiVersion;
+    EOS_ProductUserId LocalUserId;
+    const char* RealDeviceId;
+));
+#endif
+
+#ifndef EOS_RTCAUDIO_GETINPUTDEVICESCOUNT_API_LATEST
+#define EOS_RTCAUDIO_GETINPUTDEVICESCOUNT_API_LATEST 1
+EOS_STRUCT(EOS_RTCAudio_GetInputDevicesCountOptions, (
+    int32_t ApiVersion;
+));
+#endif
+
+#ifndef EOS_RTCAUDIO_GETOUTPUTDEVICESCOUNT_API_LATEST
+#define EOS_RTCAUDIO_GETOUTPUTDEVICESCOUNT_API_LATEST 1
+EOS_STRUCT(EOS_RTCAudio_GetOutputDevicesCountOptions, (
+    int32_t ApiVersion;
+));
+#endif
+
+#ifndef EOS_RTCAUDIO_COPYINPUTDEVICEINFORMATIONBYINDEX_API_LATEST
+#define EOS_RTCAUDIO_COPYINPUTDEVICEINFORMATIONBYINDEX_API_LATEST 1
+EOS_STRUCT(EOS_RTCAudio_CopyInputDeviceInformationByIndexOptions, (
+    int32_t ApiVersion;
+    uint32_t DeviceIndex;
+));
+typedef struct EOS_RTCAudio_InputDeviceInformationInternal {
+    int32_t ApiVersion;
+    EOS_Bool bDefaultDevice;
+    const char* DeviceId;
+    const char* DeviceName;
+} EOS_RTCAudio_InputDeviceInformation;
+#endif
+
+#ifndef EOS_RTCAUDIO_COPYOUTPUTDEVICEINFORMATIONBYINDEX_API_LATEST
+#define EOS_RTCAUDIO_COPYOUTPUTDEVICEINFORMATIONBYINDEX_API_LATEST 1
+EOS_STRUCT(EOS_RTCAudio_CopyOutputDeviceInformationByIndexOptions, (
+    int32_t ApiVersion;
+    uint32_t DeviceIndex;
+));
+typedef struct EOS_RTCAudio_OutputDeviceInformationInternal {
+    int32_t ApiVersion;
+    EOS_Bool bDefaultDevice;
+    const char* DeviceId;
+    const char* DeviceName;
+} EOS_RTCAudio_OutputDeviceInformation;
+#endif
+
+#ifndef EOS_RTCAUDIO_QUERYINPUTDEVICESINFORMATION_API_LATEST
+#define EOS_RTCAUDIO_QUERYINPUTDEVICESINFORMATION_API_LATEST 1
+EOS_STRUCT(EOS_RTCAudio_QueryInputDevicesInformationOptions, (
+    int32_t ApiVersion;
+));
+typedef struct EOS_RTCAudio_QueryInputDevicesInformationCallbackInfoInternal {
+    EOS_EResult ResultCode;
+    void* ClientData;
+} EOS_RTCAudio_QueryInputDevicesInformationCallbackInfo;
+typedef void (EOS_CALL* EOS_RTCAudio_OnQueryInputDevicesInformationCallback)(const EOS_RTCAudio_QueryInputDevicesInformationCallbackInfo* Data);
+#endif
+
+#ifndef EOS_RTCAUDIO_QUERYOUTPUTDEVICESINFORMATION_API_LATEST
+#define EOS_RTCAUDIO_QUERYOUTPUTDEVICESINFORMATION_API_LATEST 1
+EOS_STRUCT(EOS_RTCAudio_QueryOutputDevicesInformationOptions, (
+    int32_t ApiVersion;
+));
+typedef struct EOS_RTCAudio_QueryOutputDevicesInformationCallbackInfoInternal {
+    EOS_EResult ResultCode;
+    void* ClientData;
+} EOS_RTCAudio_QueryOutputDevicesInformationCallbackInfo;
+typedef void (EOS_CALL* EOS_RTCAudio_OnQueryOutputDevicesInformationCallback)(const EOS_RTCAudio_QueryOutputDevicesInformationCallbackInfo* Data);
+#endif
+
+#ifndef EOS_RTCAUDIO_REGISTERPLATFORMUSER_API_LATEST
+#define EOS_RTCAUDIO_REGISTERPLATFORMUSER_API_LATEST 1
+EOS_STRUCT(EOS_RTCAudio_RegisterPlatformUserOptions, (
+    int32_t ApiVersion;
+    const char* PlatformUserId;
+));
+#endif
+
+#ifndef EOS_RTCAUDIO_UNREGISTERPLATFORMUSER_API_LATEST
+#define EOS_RTCAUDIO_UNREGISTERPLATFORMUSER_API_LATEST 1
+EOS_STRUCT(EOS_RTCAudio_UnregisterPlatformUserOptions, (
+    int32_t ApiVersion;
+    const char* PlatformUserId;
+));
+#endif
+
+// Audio interface types (internal/platform-specific)
+#ifndef EOS_HAUDIO
+EXTERN_C typedef struct EOS_AudioHandle* EOS_HAudio;
+EXTERN_C typedef struct EOS_AudioInputStreamHandle* EOS_HAudioInputStream;
+EXTERN_C typedef struct EOS_AudioOutputStreamHandle* EOS_HAudioOutputStream;
+
+EOS_STRUCT(EOS_Audio_CreateNewInputStreamOptions, (int32_t ApiVersion;));
+EOS_STRUCT(EOS_Audio_CreateNewOutputStreamOptions, (int32_t ApiVersion;));
+EOS_STRUCT(EOS_Audio_GetInputDeviceInfoOptions, (int32_t ApiVersion;));
+EOS_STRUCT(EOS_Audio_GetOutputDeviceInfoOptions, (int32_t ApiVersion;));
+typedef struct EOS_Audio_InputDeviceInfoInternal { int32_t ApiVersion; } EOS_Audio_InputDeviceInfo;
+typedef struct EOS_Audio_OutputDeviceInfoInternal { int32_t ApiVersion; } EOS_Audio_OutputDeviceInfo;
+typedef struct EOS_Audio_InputStreamInfoInternal { int32_t ApiVersion; } EOS_Audio_InputStreamInfo;
+typedef struct EOS_Audio_OutputStreamInfoInternal { int32_t ApiVersion; } EOS_Audio_OutputStreamInfo;
+EOS_STRUCT(EOS_Audio_QueryInputDevicesOptions, (int32_t ApiVersion;));
+EOS_STRUCT(EOS_Audio_QueryOutputDevicesOptions, (int32_t ApiVersion;));
+typedef struct EOS_Audio_QueryInputDevicesCallbackInfoInternal { EOS_EResult ResultCode; void* ClientData; } EOS_Audio_QueryInputDevicesCallbackInfo;
+typedef struct EOS_Audio_QueryOutputDevicesCallbackInfoInternal { EOS_EResult ResultCode; void* ClientData; } EOS_Audio_QueryOutputDevicesCallbackInfo;
+typedef void (EOS_CALL* EOS_Audio_OnQueryInputDevicesCallback)(const EOS_Audio_QueryInputDevicesCallbackInfo* Data);
+typedef void (EOS_CALL* EOS_Audio_OnQueryOutputDevicesCallback)(const EOS_Audio_QueryOutputDevicesCallbackInfo* Data);
+EOS_STRUCT(EOS_Audio_RegisterUserOptions, (int32_t ApiVersion;));
+EOS_STRUCT(EOS_Audio_UnregisterUserOptions, (int32_t ApiVersion;));
+EOS_STRUCT(EOS_Audio_SetNotifyDevicesChangedOptions, (int32_t ApiVersion;));
+typedef void (EOS_CALL* EOS_Audio_OnDevicesChangedCallback)(const void* Data);
+EOS_STRUCT(EOS_Audio_SetFeatureEnabledForInputStreamOptions, (int32_t ApiVersion;));
+EOS_STRUCT(EOS_Audio_StartInputStreamOptions, (int32_t ApiVersion;));
+EOS_STRUCT(EOS_Audio_StopInputStreamOptions, (int32_t ApiVersion;));
+EOS_STRUCT(EOS_Audio_StartOutputStreamOptions, (int32_t ApiVersion;));
+EOS_STRUCT(EOS_Audio_StopOutputStreamOptions, (int32_t ApiVersion;));
+EOS_STRUCT(EOS_Audio_EnableCommunicationsModeOutputDevicesOptions, (int32_t ApiVersion;));
+#endif
+
+// BroadcastAudio interface types (internal/platform-specific)
+#ifndef EOS_HBROADCASTAUDIO
+EXTERN_C typedef struct EOS_BroadcastAudioHandle* EOS_HBroadcastAudio;
+EXTERN_C typedef struct EOS_BroadcastAudioInputStreamHandle* EOS_HBroadcastAudioInputStream;
+EXTERN_C typedef struct EOS_BroadcastAudioOutputStreamHandle* EOS_HBroadcastAudioOutputStream;
+
+EOS_STRUCT(EOS_BroadcastAudio_CreateNewInputStreamOptions, (int32_t ApiVersion;));
+EOS_STRUCT(EOS_BroadcastAudio_CreateNewOutputStreamOptions, (int32_t ApiVersion;));
+typedef struct EOS_BroadcastAudio_InputStreamInfoInternal { int32_t ApiVersion; } EOS_BroadcastAudio_InputStreamInfo;
+typedef struct EOS_BroadcastAudio_OutputStreamInfoInternal { int32_t ApiVersion; } EOS_BroadcastAudio_OutputStreamInfo;
+EOS_STRUCT(EOS_BroadcastAudio_PushPacketToOutputStreamOptions, (int32_t ApiVersion;));
+EOS_STRUCT(EOS_BroadcastAudio_SetEncoderSettingsOptions, (int32_t ApiVersion;));
+EOS_STRUCT(EOS_BroadcastAudio_SetMicProcessingSettingsOptions, (int32_t ApiVersion;));
+#endif
+
 // ============================================================================
 // RTCAudio Stubs
 // ============================================================================
