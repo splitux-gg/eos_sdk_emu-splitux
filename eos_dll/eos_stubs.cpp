@@ -22,10 +22,11 @@
 
 #include "common_includes.h"
 
-// Include RTCAudio types only (not included by default in eos_sdk.h)
-// Note: We include eos_rtc_audio_types.h directly instead of eos_rtc_audio.h
-// to avoid duplicate function declarations
+// Include RTC types (not included by default in eos_sdk.h)
+// Note: We include types headers directly to avoid duplicate function declarations
+#include <eos_rtc_types.h>
 #include <eos_rtc_audio_types.h>
+#include <eos_rtc_data_types.h>
 
 // Forward declarations for types not in SDK headers that are needed for newer SDK versions
 // These types may be added in future SDK versions but we need stubs now
@@ -738,6 +739,63 @@ EOS_DECLARE_FUNC(EOS_EResult) EOS_BroadcastAudio_StartOutputStream(EOS_HBroadcas
 }
 
 EOS_DECLARE_FUNC(EOS_EResult) EOS_BroadcastAudio_StopOutputStream(EOS_HBroadcastAudio Handle, EOS_HBroadcastAudioOutputStream Stream)
+{
+    return EOS_EResult::EOS_Success;
+}
+
+// ============================================================================
+// RTC Core Stubs (missing exports)
+// ============================================================================
+
+EOS_DECLARE_FUNC(EOS_HRTCAudio) EOS_RTC_GetAudioInterface(EOS_HRTC Handle)
+{
+    return nullptr;
+}
+
+EOS_DECLARE_FUNC(EOS_HRTCData) EOS_RTC_GetDataInterface(EOS_HRTC Handle)
+{
+    return nullptr;
+}
+
+EOS_DECLARE_FUNC(void) EOS_RTC_JoinRoom(EOS_HRTC Handle, const EOS_RTC_JoinRoomOptions* Options, void* ClientData, const EOS_RTC_OnJoinRoomCallback CompletionDelegate)
+{
+    if (CompletionDelegate)
+    {
+        EOS_RTC_JoinRoomCallbackInfo info = {};
+        info.ResultCode = EOS_EResult::EOS_Success;
+        info.ClientData = ClientData;
+        CompletionDelegate(&info);
+    }
+}
+
+EOS_DECLARE_FUNC(void) EOS_RTC_LeaveRoom(EOS_HRTC Handle, const EOS_RTC_LeaveRoomOptions* Options, void* ClientData, const EOS_RTC_OnLeaveRoomCallback CompletionDelegate)
+{
+    if (CompletionDelegate)
+    {
+        EOS_RTC_LeaveRoomCallbackInfo info = {};
+        info.ResultCode = EOS_EResult::EOS_Success;
+        info.ClientData = ClientData;
+        CompletionDelegate(&info);
+    }
+}
+
+EOS_DECLARE_FUNC(void) EOS_RTC_BlockParticipant(EOS_HRTC Handle, const EOS_RTC_BlockParticipantOptions* Options, void* ClientData, const EOS_RTC_OnBlockParticipantCallback CompletionDelegate)
+{
+    if (CompletionDelegate)
+    {
+        EOS_RTC_BlockParticipantCallbackInfo info = {};
+        info.ResultCode = EOS_EResult::EOS_Success;
+        info.ClientData = ClientData;
+        CompletionDelegate(&info);
+    }
+}
+
+EOS_DECLARE_FUNC(EOS_EResult) EOS_RTC_SetSetting(EOS_HRTC Handle, const EOS_RTC_SetSettingOptions* Options)
+{
+    return EOS_EResult::EOS_Success;
+}
+
+EOS_DECLARE_FUNC(EOS_EResult) EOS_RTC_SetRoomSetting(EOS_HRTC Handle, const EOS_RTC_SetRoomSettingOptions* Options)
 {
     return EOS_EResult::EOS_Success;
 }

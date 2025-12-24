@@ -221,7 +221,16 @@ EOS_DECLARE_FUNC(void) EOS_Connect_IdToken_Release(EOS_Connect_IdToken* IdToken)
 {
 }
 
-// EOS_Connect_VerifyIdToken is already declared in SDK with different signature (void with callback)
+EOS_DECLARE_FUNC(void) EOS_Connect_VerifyIdToken(EOS_HConnect Handle, const EOS_Connect_VerifyIdTokenOptions* Options, void* ClientData, const EOS_Connect_OnVerifyIdTokenCallback CompletionDelegate)
+{
+    if (CompletionDelegate)
+    {
+        EOS_Connect_VerifyIdTokenCallbackInfo info = {};
+        info.ResultCode = EOS_EResult::EOS_Success;
+        info.ClientData = ClientData;
+        CompletionDelegate(&info);
+    }
+}
 
 EOS_DECLARE_FUNC(void) EOS_Connect_Logout(EOS_HConnect Handle, const EOS_Connect_LogoutOptions* Options, void* ClientData, const EOS_Connect_OnLogoutCallback CompletionDelegate)
 {
