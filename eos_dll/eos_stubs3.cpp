@@ -7,6 +7,158 @@
 
 #include "common_includes.h"
 
+// Forward declarations and type mappings for SDK 1.16+ types
+
+// Lobby types - map to versioned types
+#ifndef EOS_Lobby_AddNotifyLobbyInviteRejectedOptions
+#define EOS_Lobby_AddNotifyLobbyInviteRejectedOptions EOS_Lobby_AddNotifyLobbyInviteRejectedOptions001
+#endif
+#ifndef EOS_Lobby_AddNotifyLeaveLobbyRequestedOptions
+#define EOS_Lobby_AddNotifyLeaveLobbyRequestedOptions EOS_Lobby_AddNotifyLeaveLobbyRequestedOptions001
+#endif
+#ifndef EOS_Lobby_AddNotifySendLobbyNativeInviteRequestedOptions
+#define EOS_Lobby_AddNotifySendLobbyNativeInviteRequestedOptions EOS_Lobby_AddNotifySendLobbyNativeInviteRequestedOptions001
+#endif
+#ifndef EOS_Lobby_HardMuteMemberOptions
+#define EOS_Lobby_HardMuteMemberOptions EOS_Lobby_HardMuteMemberOptions001
+#endif
+#ifndef EOS_Lobby_GetConnectStringOptions
+#define EOS_Lobby_GetConnectStringOptions EOS_Lobby_GetConnectStringOptions001
+#endif
+#ifndef EOS_Lobby_ParseConnectStringOptions
+#define EOS_Lobby_ParseConnectStringOptions EOS_Lobby_ParseConnectStringOptions001
+#endif
+#ifndef EOS_Lobby_JoinLobbyByIdOptions
+#define EOS_Lobby_JoinLobbyByIdOptions EOS_Lobby_JoinLobbyByIdOptions002
+#endif
+#ifndef EOS_LobbyModification_SetAllowedPlatformIdsOptions
+#define EOS_LobbyModification_SetAllowedPlatformIdsOptions EOS_LobbyModification_SetAllowedPlatformIdsOptions001
+#endif
+#ifndef EOS_LobbyDetails_CopyMemberInfoOptions
+#define EOS_LobbyDetails_CopyMemberInfoOptions EOS_LobbyDetails_CopyMemberInfoOptions001
+#endif
+#ifndef EOS_LobbyDetails_MemberInfo
+#define EOS_LobbyDetails_MemberInfo EOS_LobbyDetails_MemberInfo001
+#endif
+
+// Lobby RTC types (new in SDK 1.16+)
+#ifndef EOS_LOBBY_JOINRTCROOM_API_LATEST
+#define EOS_LOBBY_JOINRTCROOM_API_LATEST 1
+EOS_STRUCT(EOS_Lobby_JoinRTCRoomOptions, (
+    int32_t ApiVersion;
+    EOS_LobbyId LobbyId;
+    EOS_ProductUserId LocalUserId;
+    EOS_Bool bEnableRTCRoom;
+));
+typedef struct EOS_Lobby_JoinRTCRoomCallbackInfoInternal {
+    EOS_EResult ResultCode;
+    void* ClientData;
+    EOS_LobbyId LobbyId;
+} EOS_Lobby_JoinRTCRoomCallbackInfo;
+typedef void (EOS_CALL* EOS_Lobby_OnJoinRTCRoomCallback)(const EOS_Lobby_JoinRTCRoomCallbackInfo* Data);
+#endif
+
+#ifndef EOS_LOBBY_LEAVERTCROOM_API_LATEST
+#define EOS_LOBBY_LEAVERTCROOM_API_LATEST 1
+EOS_STRUCT(EOS_Lobby_LeaveRTCRoomOptions, (
+    int32_t ApiVersion;
+    EOS_LobbyId LobbyId;
+    EOS_ProductUserId LocalUserId;
+));
+typedef struct EOS_Lobby_LeaveRTCRoomCallbackInfoInternal {
+    EOS_EResult ResultCode;
+    void* ClientData;
+    EOS_LobbyId LobbyId;
+} EOS_Lobby_LeaveRTCRoomCallbackInfo;
+typedef void (EOS_CALL* EOS_Lobby_OnLeaveRTCRoomCallback)(const EOS_Lobby_LeaveRTCRoomCallbackInfo* Data);
+#endif
+
+// Sessions types
+#ifndef EOS_SESSIONS_ADDNOTIFYSESSIONINVITEREJECTED_API_LATEST
+#define EOS_SESSIONS_ADDNOTIFYSESSIONINVITEREJECTED_API_LATEST 1
+EOS_STRUCT(EOS_Sessions_AddNotifySessionInviteRejectedOptions, (int32_t ApiVersion;));
+typedef void (EOS_CALL* EOS_Sessions_OnSessionInviteRejectedCallback)(const void* Data);
+EOS_STRUCT(EOS_Sessions_AddNotifyLeaveSessionRequestedOptions, (int32_t ApiVersion;));
+typedef void (EOS_CALL* EOS_Sessions_OnLeaveSessionRequestedCallback)(const void* Data);
+EOS_STRUCT(EOS_Sessions_AddNotifySendSessionNativeInviteRequestedOptions, (int32_t ApiVersion;));
+typedef void (EOS_CALL* EOS_Sessions_OnSendSessionNativeInviteRequestedCallback)(const void* Data);
+#endif
+
+#ifndef EOS_SESSIONMODIFICATION_SETALLOWEDPLATFORMIDS_API_LATEST
+#define EOS_SESSIONMODIFICATION_SETALLOWEDPLATFORMIDS_API_LATEST 1
+EOS_STRUCT(EOS_SessionModification_SetAllowedPlatformIdsOptions, (int32_t ApiVersion; const uint32_t* AllowedPlatformIds; uint32_t AllowedPlatformIdsCount;));
+#endif
+
+#ifndef EOS_P2P_PacketQueueInfo
+#define EOS_P2P_PacketQueueInfo EOS_P2P_PacketQueueInfo001
+#endif
+
+// Sanctions types
+#ifndef EOS_SANCTIONS_CREATEPLAYERSANCTIONAPPEAL_API_LATEST
+#define EOS_SANCTIONS_CREATEPLAYERSANCTIONAPPEAL_API_LATEST 1
+EOS_STRUCT(EOS_Sanctions_CreatePlayerSanctionAppealOptions, (
+    int32_t ApiVersion;
+    EOS_ProductUserId LocalUserId;
+    const char* SanctionIdToAppeal;
+    const char* Reason;
+));
+typedef struct EOS_Sanctions_CreatePlayerSanctionAppealCallbackInfoInternal {
+    EOS_EResult ResultCode;
+    void* ClientData;
+} EOS_Sanctions_CreatePlayerSanctionAppealCallbackInfo;
+typedef void (EOS_CALL* EOS_Sanctions_OnCreatePlayerSanctionAppealCallback)(const EOS_Sanctions_CreatePlayerSanctionAppealCallbackInfo* Data);
+#endif
+
+// UI types
+#ifndef EOS_UI_ADDNOTIFYMEMORYMONITOR_API_LATEST
+#define EOS_UI_ADDNOTIFYMEMORYMONITOR_API_LATEST 1
+EOS_STRUCT(EOS_UI_AddNotifyMemoryMonitorOptions, (int32_t ApiVersion;));
+typedef void (EOS_CALL* EOS_UI_OnMemoryMonitorCallback)(const void* Data);
+#endif
+
+#ifndef EOS_UI_SETTOGGLEFRIENDSBUTTON_API_LATEST
+#define EOS_UI_SETTOGGLEFRIENDSBUTTON_API_LATEST 1
+EOS_STRUCT(EOS_UI_SetToggleFriendsButtonOptions, (int32_t ApiVersion; uint32_t ButtonCombination;));
+EOS_STRUCT(EOS_UI_GetToggleFriendsButtonOptions, (int32_t ApiVersion;));
+#endif
+
+#ifndef EOS_UI_GETFRIENDSEXCLUSIVEINPUT_API_LATEST
+#define EOS_UI_GETFRIENDSEXCLUSIVEINPUT_API_LATEST 1
+EOS_STRUCT(EOS_UI_GetFriendsExclusiveInputOptions, (int32_t ApiVersion; EOS_EpicAccountId LocalUserId;));
+#endif
+
+#ifndef EOS_UI_REPORTINPUTSTATE_API_LATEST
+#define EOS_UI_REPORTINPUTSTATE_API_LATEST 1
+EOS_STRUCT(EOS_UI_ReportInputStateOptions, (int32_t ApiVersion;));
+#endif
+
+#ifndef EOS_UI_ISSOCIALOVERLAYPAUSED_API_LATEST
+#define EOS_UI_ISSOCIALOVERLAYPAUSED_API_LATEST 1
+EOS_STRUCT(EOS_UI_IsSocialOverlayPausedOptions, (int32_t ApiVersion; EOS_EpicAccountId LocalUserId;));
+EOS_STRUCT(EOS_UI_PauseSocialOverlayOptions, (int32_t ApiVersion; EOS_Bool bIsPaused;));
+#endif
+
+#ifndef EOS_UI_SHOWBLOCKPLAYER_API_LATEST
+#define EOS_UI_SHOWBLOCKPLAYER_API_LATEST 1
+EOS_STRUCT(EOS_UI_ShowBlockPlayerOptions, (int32_t ApiVersion; EOS_EpicAccountId LocalUserId; EOS_EpicAccountId TargetUserId;));
+typedef struct EOS_UI_ShowBlockPlayerCallbackInfoInternal { EOS_EResult ResultCode; void* ClientData; EOS_EpicAccountId LocalUserId; EOS_EpicAccountId TargetUserId; } EOS_UI_ShowBlockPlayerCallbackInfo;
+typedef void (EOS_CALL* EOS_UI_OnShowBlockPlayerCallback)(const EOS_UI_ShowBlockPlayerCallbackInfo* Data);
+#endif
+
+#ifndef EOS_UI_SHOWREPORTPLAYER_API_LATEST
+#define EOS_UI_SHOWREPORTPLAYER_API_LATEST 1
+EOS_STRUCT(EOS_UI_ShowReportPlayerOptions, (int32_t ApiVersion; EOS_EpicAccountId LocalUserId; EOS_EpicAccountId TargetUserId;));
+typedef struct EOS_UI_ShowReportPlayerCallbackInfoInternal { EOS_EResult ResultCode; void* ClientData; EOS_EpicAccountId LocalUserId; EOS_EpicAccountId TargetUserId; } EOS_UI_ShowReportPlayerCallbackInfo;
+typedef void (EOS_CALL* EOS_UI_OnShowReportPlayerCallback)(const EOS_UI_ShowReportPlayerCallbackInfo* Data);
+#endif
+
+#ifndef EOS_UI_SHOWNATIVEPROFILE_API_LATEST
+#define EOS_UI_SHOWNATIVEPROFILE_API_LATEST 1
+EOS_STRUCT(EOS_UI_ShowNativeProfileOptions, (int32_t ApiVersion; EOS_EpicAccountId LocalUserId; EOS_EpicAccountId TargetUserId;));
+typedef struct EOS_UI_ShowNativeProfileCallbackInfoInternal { EOS_EResult ResultCode; void* ClientData; EOS_EpicAccountId LocalUserId; EOS_EpicAccountId TargetUserId; } EOS_UI_ShowNativeProfileCallbackInfo;
+typedef void (EOS_CALL* EOS_UI_OnShowNativeProfileCallback)(const EOS_UI_ShowNativeProfileCallbackInfo* Data);
+#endif
+
 // ============================================================================
 // Lobby Additional Stubs
 // ============================================================================

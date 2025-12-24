@@ -8,6 +8,129 @@
 #include "common_includes.h"
 
 // Forward declarations for types not in current SDK version
+
+// Connect Logout types (SDK 1.16+)
+#ifndef EOS_CONNECT_LOGOUT_API_LATEST
+#define EOS_CONNECT_LOGOUT_API_LATEST 1
+EOS_STRUCT(EOS_Connect_LogoutOptions, (
+    int32_t ApiVersion;
+    EOS_ProductUserId LocalUserId;
+));
+typedef struct EOS_Connect_LogoutCallbackInfoInternal {
+    EOS_EResult ResultCode;
+    void* ClientData;
+    EOS_ProductUserId LocalUserId;
+} EOS_Connect_LogoutCallbackInfo;
+typedef void (EOS_CALL* EOS_Connect_OnLogoutCallback)(const EOS_Connect_LogoutCallbackInfo* Data);
+#endif
+
+// CustomInvites Rejected types
+#ifndef EOS_CUSTOMINVITES_ADDNOTIFYCUSTOMINVITEREJECTED_API_LATEST
+#define EOS_CUSTOMINVITES_ADDNOTIFYCUSTOMINVITEREJECTED_API_LATEST 1
+EOS_STRUCT(EOS_CustomInvites_AddNotifyCustomInviteRejectedOptions, (
+    int32_t ApiVersion;
+));
+typedef void (EOS_CALL* EOS_CustomInvites_OnCustomInviteRejectedCallback)(const void* Data);
+#endif
+
+// CustomInvites SendRequestToJoin types
+#ifndef EOS_CUSTOMINVITES_SENDREQUESTTOJOIN_API_LATEST
+#define EOS_CUSTOMINVITES_SENDREQUESTTOJOIN_API_LATEST 1
+EOS_STRUCT(EOS_CustomInvites_SendRequestToJoinOptions, (
+    int32_t ApiVersion;
+    EOS_ProductUserId LocalUserId;
+    EOS_ProductUserId TargetUserId;
+));
+typedef struct EOS_CustomInvites_SendRequestToJoinCallbackInfoInternal {
+    EOS_EResult ResultCode;
+    void* ClientData;
+    EOS_ProductUserId LocalUserId;
+    EOS_ProductUserId TargetUserId;
+} EOS_CustomInvites_SendRequestToJoinCallbackInfo;
+typedef void (EOS_CALL* EOS_CustomInvites_OnSendRequestToJoinCallback)(const EOS_CustomInvites_SendRequestToJoinCallbackInfo* Data);
+#endif
+
+// CustomInvites RequestToJoin notification types
+#ifndef EOS_CUSTOMINVITES_ADDNOTIFYREQUESTTOJOINRECEIVED_API_LATEST
+#define EOS_CUSTOMINVITES_ADDNOTIFYREQUESTTOJOINRECEIVED_API_LATEST 1
+EOS_STRUCT(EOS_CustomInvites_AddNotifyRequestToJoinReceivedOptions, (int32_t ApiVersion;));
+typedef void (EOS_CALL* EOS_CustomInvites_OnRequestToJoinReceivedCallback)(const void* Data);
+EOS_STRUCT(EOS_CustomInvites_AddNotifyRequestToJoinAcceptedOptions, (int32_t ApiVersion;));
+typedef void (EOS_CALL* EOS_CustomInvites_OnRequestToJoinAcceptedCallback)(const void* Data);
+EOS_STRUCT(EOS_CustomInvites_AddNotifyRequestToJoinRejectedOptions, (int32_t ApiVersion;));
+typedef void (EOS_CALL* EOS_CustomInvites_OnRequestToJoinRejectedCallback)(const void* Data);
+#endif
+
+// CustomInvites Accept/Reject RequestToJoin types
+#ifndef EOS_CUSTOMINVITES_ACCEPTREQUESTTOJOIN_API_LATEST
+#define EOS_CUSTOMINVITES_ACCEPTREQUESTTOJOIN_API_LATEST 1
+EOS_STRUCT(EOS_CustomInvites_AcceptRequestToJoinOptions, (
+    int32_t ApiVersion;
+    EOS_ProductUserId LocalUserId;
+    EOS_ProductUserId TargetUserId;
+));
+typedef struct EOS_CustomInvites_AcceptRequestToJoinCallbackInfoInternal {
+    EOS_EResult ResultCode;
+    void* ClientData;
+    EOS_ProductUserId LocalUserId;
+    EOS_ProductUserId TargetUserId;
+} EOS_CustomInvites_AcceptRequestToJoinCallbackInfo;
+typedef void (EOS_CALL* EOS_CustomInvites_OnAcceptRequestToJoinCallback)(const EOS_CustomInvites_AcceptRequestToJoinCallbackInfo* Data);
+#endif
+
+#ifndef EOS_CUSTOMINVITES_REJECTREQUESTTOJOIN_API_LATEST
+#define EOS_CUSTOMINVITES_REJECTREQUESTTOJOIN_API_LATEST 1
+EOS_STRUCT(EOS_CustomInvites_RejectRequestToJoinOptions, (
+    int32_t ApiVersion;
+    EOS_ProductUserId LocalUserId;
+    EOS_ProductUserId TargetUserId;
+));
+typedef struct EOS_CustomInvites_RejectRequestToJoinCallbackInfoInternal {
+    EOS_EResult ResultCode;
+    void* ClientData;
+    EOS_ProductUserId LocalUserId;
+    EOS_ProductUserId TargetUserId;
+} EOS_CustomInvites_RejectRequestToJoinCallbackInfo;
+typedef void (EOS_CALL* EOS_CustomInvites_OnRejectRequestToJoinCallback)(const EOS_CustomInvites_RejectRequestToJoinCallbackInfo* Data);
+#endif
+
+// CustomInvites additional types
+#ifndef EOS_CUSTOMINVITES_ADDNOTIFYREQUESTTOJOINRESPONSERECEIVEDOPTIONS_API_LATEST
+#define EOS_CUSTOMINVITES_ADDNOTIFYREQUESTTOJOINRESPONSERECEIVEDOPTIONS_API_LATEST 1
+EOS_STRUCT(EOS_CustomInvites_AddNotifyRequestToJoinResponseReceivedOptions, (int32_t ApiVersion;));
+typedef void (EOS_CALL* EOS_CustomInvites_OnRequestToJoinResponseReceivedCallback)(const void* Data);
+EOS_STRUCT(EOS_CustomInvites_AddNotifySendCustomNativeInviteRequestedOptions, (int32_t ApiVersion;));
+typedef void (EOS_CALL* EOS_CustomInvites_OnSendCustomNativeInviteRequestedCallback)(const void* Data);
+#endif
+
+// Friends types
+#ifndef EOS_FRIENDS_ADDNOTIFYBLOCKEDUSERSUPDATE_API_LATEST
+#define EOS_FRIENDS_ADDNOTIFYBLOCKEDUSERSUPDATE_API_LATEST 1
+EOS_STRUCT(EOS_Friends_AddNotifyBlockedUsersUpdateOptions, (int32_t ApiVersion;));
+typedef void (EOS_CALL* EOS_Friends_OnBlockedUsersUpdateCallback)(const void* Data);
+EOS_STRUCT(EOS_Friends_GetBlockedUsersCountOptions, (int32_t ApiVersion; EOS_EpicAccountId LocalUserId;));
+EOS_STRUCT(EOS_Friends_GetBlockedUserAtIndexOptions, (int32_t ApiVersion; EOS_EpicAccountId LocalUserId; int32_t Index;));
+#endif
+
+// Ecom QueryEntitlementToken types
+#ifndef EOS_ECOM_QUERYENTITLEMENTTOKEN_API_LATEST
+#define EOS_ECOM_QUERYENTITLEMENTTOKEN_API_LATEST 1
+EOS_STRUCT(EOS_Ecom_QueryEntitlementTokenOptions, (
+    int32_t ApiVersion;
+    EOS_EpicAccountId LocalUserId;
+    const EOS_Ecom_EntitlementId* EntitlementIds;
+    uint32_t EntitlementIdCount;
+));
+typedef struct EOS_Ecom_QueryEntitlementTokenCallbackInfoInternal {
+    EOS_EResult ResultCode;
+    void* ClientData;
+    EOS_EpicAccountId LocalUserId;
+    const char* EntitlementToken;
+} EOS_Ecom_QueryEntitlementTokenCallbackInfo;
+typedef void (EOS_CALL* EOS_Ecom_OnQueryEntitlementTokenCallback)(const EOS_Ecom_QueryEntitlementTokenCallbackInfo* Data);
+#endif
+
+// Ecom types
 #ifndef EOS_ECOM_QUERYOWNERSHIPBYSANDBOXIDS_API_LATEST
 #define EOS_ECOM_QUERYOWNERSHIPBYSANDBOXIDS_API_LATEST 1
 EOS_STRUCT(EOS_Ecom_QueryOwnershipBySandboxIdsOptions, (
@@ -98,10 +221,7 @@ EOS_DECLARE_FUNC(void) EOS_Connect_IdToken_Release(EOS_Connect_IdToken* IdToken)
 {
 }
 
-EOS_DECLARE_FUNC(EOS_EResult) EOS_Connect_VerifyIdToken(EOS_HConnect Handle, const EOS_Connect_VerifyIdTokenOptions* Options)
-{
-    return EOS_EResult::EOS_Success;
-}
+// EOS_Connect_VerifyIdToken is already declared in SDK with different signature (void with callback)
 
 EOS_DECLARE_FUNC(void) EOS_Connect_Logout(EOS_HConnect Handle, const EOS_Connect_LogoutOptions* Options, void* ClientData, const EOS_Connect_OnLogoutCallback CompletionDelegate)
 {
