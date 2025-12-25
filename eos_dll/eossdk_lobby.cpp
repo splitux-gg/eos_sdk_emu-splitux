@@ -1906,6 +1906,9 @@ bool EOSSDK_Lobby::on_lobby_join_response(Network_Message_pb const& msg, Lobby_J
             lobby._state.infos = resp.infos();
 
             add_member_to_lobby(msg.dest_id(), &lobby._state);
+
+            // Notify the joining client that they successfully joined
+            notify_lobby_member_status_update(msg.dest_id(), EOS_ELobbyMemberStatus::EOS_LMS_JOINED, &lobby._state);
         }
         else
         {
