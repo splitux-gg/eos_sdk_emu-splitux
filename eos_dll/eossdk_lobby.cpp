@@ -273,10 +273,13 @@ void EOSSDK_Lobby::notify_lobby_update(lobby_state_t* lobby)
 
 void EOSSDK_Lobby::notify_lobby_member_status_update(std::string const& member, EOS_ELobbyMemberStatus new_status, lobby_state_t* lobby)
 {
+    TRACE_FUNC();
     assert(lobby != nullptr);
 
     EOS_ProductUserId member_id = GetProductUserId(member);
     std::vector<pFrameResult_t> notifs(std::move(GetCB_Manager().get_notifications(this, EOS_Lobby_LobbyMemberStatusReceivedCallbackInfo::k_iCallback)));
+    APP_LOG(Log::LogLevel::DEBUG, "notify_lobby_member_status_update: member=%s, status=%d, notifs_count=%zu",
+            member.c_str(), static_cast<int>(new_status), notifs.size());
     for (auto& notif : notifs)
     {
         EOS_Lobby_LobbyMemberStatusReceivedCallbackInfo& lmsrci = notif->GetCallback<EOS_Lobby_LobbyMemberStatusReceivedCallbackInfo>();
