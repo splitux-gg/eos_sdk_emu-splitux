@@ -1,0 +1,3 @@
+/usr/bin/cmake -E rm -f CMakeFiles/EOSSDK-Win64-Shipping.dir/objects.a
+/usr/bin/x86_64-w64-mingw32-ar qc CMakeFiles/EOSSDK-Win64-Shipping.dir/objects.a @CMakeFiles/EOSSDK-Win64-Shipping.dir/objects1.rsp
+/usr/bin/x86_64-w64-mingw32-g++ -O3 -DNDEBUG -shared -o bin/libEOSSDK-Win64-Shipping.dll -Wl,--out-implib,lib/libEOSSDK-Win64-Shipping.dll.a -Wl,--major-image-version,0,--minor-image-version,0 -Wl,--whole-archive CMakeFiles/EOSSDK-Win64-Shipping.dir/objects.a -Wl,--no-whole-archive @CMakeFiles/EOSSDK-Win64-Shipping.dir/linkLibs.rsp

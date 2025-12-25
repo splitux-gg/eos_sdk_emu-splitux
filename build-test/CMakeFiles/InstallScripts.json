@@ -1,0 +1,7 @@
+{
+	"InstallScripts" : 
+	[
+		"/home/alphasigmachad/Code/eos_sdk_emu-splitux/build-test/cmake_install.cmake"
+	],
+	"Parallel" : false
+}

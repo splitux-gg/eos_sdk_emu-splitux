@@ -113,13 +113,16 @@ void EOSSDK_P2P::set_p2p_state_connected(EOS_ProductUserId remote_id, p2p_state_
  */
 EOS_EResult EOSSDK_P2P::SendPacket(const EOS_P2P_SendPacketOptions* Options)
 {
-    //TRACE_FUNC();
+    TRACE_FUNC();
     GLOBAL_LOCK();
-    
+
     if (Options == nullptr || Options->RemoteUserId == nullptr || Options->Data == nullptr)
         return EOS_EResult::EOS_InvalidParameters;
 
     p2p_state_t& p2p_state = _p2p_connections[Options->RemoteUserId];
+    APP_LOG(Log::LogLevel::DEBUG, "SendPacket: state=%d, bytes=%u, remote=%s",
+            static_cast<int>(p2p_state.status), Options->DataLengthBytes,
+            Options->RemoteUserId->to_string().c_str());
     P2P_Data_Message_pb data;
 
     switch (Options->ApiVersion)
@@ -954,11 +957,13 @@ bool EOSSDK_P2P::on_p2p_connection_response(Network_Message_pb const& msg, P2P_C
 
 bool EOSSDK_P2P::on_p2p_data(Network_Message_pb const& msg, P2P_Data_Message_pb const& data)
 {
-    //TRACE_FUNC();
+    TRACE_FUNC();
     std::lock_guard<std::recursive_mutex> lk(local_mutex);
 
     EOS_ProductUserId remote_id = GetProductUserId(msg.source_id());
     auto& p2p_state = _p2p_connections[remote_id];
+    APP_LOG(Log::LogLevel::DEBUG, "on_p2p_data: state=%d, bytes=%zu, from=%s",
+            static_cast<int>(p2p_state.status), data.data().size(), msg.source_id().c_str());
 
     P2P_Data_Acknowledge_pb* ack = new P2P_Data_Acknowledge_pb;
 
