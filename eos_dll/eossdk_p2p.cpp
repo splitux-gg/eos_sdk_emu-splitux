@@ -128,8 +128,8 @@ EOS_EResult EOSSDK_P2P::SendPacket(const EOS_P2P_SendPacketOptions* Options)
         snprintf(buf, sizeof(buf), "%02x ", ((const uint8_t*)Options->Data)[i]);
         hex_preview += buf;
     }
-    APP_LOG(Log::LogLevel::INFO, "SendPacket: ch=%d, bytes=%u, hex=[%s]",
-            Options->Channel, Options->DataLengthBytes, hex_preview.c_str());
+    APP_LOG(Log::LogLevel::INFO, "SendPacket: sock=%s, ch=%d, bytes=%u, hex=[%s]",
+            Options->SocketId->SocketName, Options->Channel, Options->DataLengthBytes, hex_preview.c_str());
 
     P2P_Data_Message_pb data;
 
@@ -319,8 +319,8 @@ EOS_EResult EOSSDK_P2P::ReceivePacket(const EOS_P2P_ReceivePacketOptions* Option
         snprintf(buf, sizeof(buf), "%02x ", ((const uint8_t*)OutData)[i]);
         hex_preview += buf;
     }
-    APP_LOG(Log::LogLevel::INFO, "ReceivePacket: ch=%d, bytes=%u, hex=[%s]",
-            *OutChannel, *OutBytesWritten, hex_preview.c_str());
+    APP_LOG(Log::LogLevel::INFO, "ReceivePacket: sock=%s, ch=%d, bytes=%u, hex=[%s]",
+            OutSocketId->SocketName, *OutChannel, *OutBytesWritten, hex_preview.c_str());
 
     queue->pop_front();
 
