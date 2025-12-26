@@ -344,6 +344,8 @@ EOS_NotificationId EOSSDK_P2P::AddNotifyPeerConnectionRequest(const EOS_P2P_AddN
     TRACE_FUNC();
     GLOBAL_LOCK();
 
+    APP_LOG(Log::LogLevel::INFO, "AddNotifyPeerConnectionRequest called, handler=%p", (void*)ConnectionRequestHandler);
+
     if (ConnectionRequestHandler == nullptr)
         return EOS_INVALID_NOTIFICATIONID;
 
@@ -388,6 +390,8 @@ void EOSSDK_P2P::RemoveNotifyPeerConnectionRequest(EOS_NotificationId Notificati
 EOS_NotificationId EOSSDK_P2P::AddNotifyPeerConnectionEstablished(const EOS_P2P_AddNotifyPeerConnectionEstablishedOptions* Options, void* ClientData, EOS_P2P_OnPeerConnectionEstablishedCallback ConnectionEstablishedHandler) {
     TRACE_FUNC();
     GLOBAL_LOCK();
+
+    APP_LOG(Log::LogLevel::INFO, "AddNotifyPeerConnectionEstablished called, handler=%p", (void*)ConnectionEstablishedHandler);
 
     if (ConnectionEstablishedHandler == nullptr)
         return EOS_INVALID_NOTIFICATIONID;
@@ -526,9 +530,13 @@ EOS_EResult EOSSDK_P2P::AcceptConnection(const EOS_P2P_AcceptConnectionOptions* 
     TRACE_FUNC();
     GLOBAL_LOCK();
 
+    APP_LOG(Log::LogLevel::INFO, "AcceptConnection called, remote=%s, socket=%s",
+            Options && Options->RemoteUserId ? Options->RemoteUserId->to_string().c_str() : "null",
+            Options && Options->SocketId ? Options->SocketId->SocketName : "null");
+
     if (Options == nullptr || Options->RemoteUserId == nullptr || Options->SocketId == nullptr)
         return EOS_EResult::EOS_InvalidParameters;
-    
+
     auto& conn = _p2p_connections[Options->RemoteUserId];
 
     if (conn.status == p2p_state_t::status_e::requesting)
