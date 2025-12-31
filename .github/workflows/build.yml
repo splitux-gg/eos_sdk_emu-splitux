@@ -16,7 +16,7 @@ env:
 
 jobs:
   build-windows:
-    runs-on: windows-latest
+    runs-on: [self-hosted, windows, x64]
     strategy:
       fail-fast: false
       matrix:
@@ -31,9 +31,6 @@ jobs:
           script: |
             core.exportVariable('ACTIONS_CACHE_URL', process.env.ACTIONS_CACHE_URL || '');
             core.exportVariable('ACTIONS_RUNTIME_TOKEN', process.env.ACTIONS_RUNTIME_TOKEN || '');
-
-      - name: Setup MSVC
-        uses: microsoft/setup-msbuild@v2
 
       - name: Cache vcpkg
         uses: actions/cache@v4
