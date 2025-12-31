@@ -54,23 +54,27 @@ jobs:
         run: .\vcpkg\bootstrap-vcpkg.bat
 
       - name: Install dependencies
+        shell: cmd
         run: |
           .\vcpkg\vcpkg install protobuf:${{ matrix.arch }}-windows-static
           .\vcpkg\vcpkg install nlohmann-json:${{ matrix.arch }}-windows-static
 
       - name: Configure CMake
+        shell: cmd
         run: |
-          cmake -B build -S . `
-            -A ${{ matrix.arch == 'x64' && 'x64' || 'Win32' }} `
-            -DCMAKE_TOOLCHAIN_FILE="${{ github.workspace }}/vcpkg/scripts/buildsystems/vcpkg.cmake" `
-            -DVCPKG_TARGET_TRIPLET=${{ matrix.arch }}-windows-static `
-            -D${{ matrix.arch == 'x64' && 'X64' || 'X86' }}=ON `
+          cmake -B build -S . ^
+            -A ${{ matrix.arch == 'x64' && 'x64' || 'Win32' }} ^
+            -DCMAKE_TOOLCHAIN_FILE="${{ github.workspace }}/vcpkg/scripts/buildsystems/vcpkg.cmake" ^
+            -DVCPKG_TARGET_TRIPLET=${{ matrix.arch }}-windows-static ^
+            -D${{ matrix.arch == 'x64' && 'X64' || 'X86' }}=ON ^
             -DCMAKE_BUILD_TYPE=Release
 
       - name: Build
+        shell: cmd
         run: cmake --build build --config Release
 
       - name: Install
+        shell: cmd
         run: cmake --install build --config Release
 
       - name: Upload artifact
