@@ -45,12 +45,13 @@ jobs:
 
       - name: Clone vcpkg
         if: steps.cache-vcpkg.outputs.cache-hit != 'true'
+        shell: cmd
         run: git clone https://github.com/microsoft/vcpkg.git
 
       - name: Bootstrap vcpkg
         if: steps.cache-vcpkg.outputs.cache-hit != 'true'
-        run: .\vcpkg\bootstrap-vcpkg.bat
         shell: cmd
+        run: .\vcpkg\bootstrap-vcpkg.bat
 
       - name: Install dependencies
         run: |
@@ -109,7 +110,9 @@ jobs:
 
       - name: Clone vcpkg
         if: steps.cache-vcpkg.outputs.cache-hit != 'true'
-        run: git clone https://github.com/microsoft/vcpkg.git
+        run: |
+          rm -rf vcpkg || true
+          git clone https://github.com/microsoft/vcpkg.git
 
       - name: Bootstrap vcpkg
         if: steps.cache-vcpkg.outputs.cache-hit != 'true'
