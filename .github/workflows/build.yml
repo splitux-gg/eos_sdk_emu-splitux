@@ -206,12 +206,11 @@ jobs:
           fi
 
       - name: Package Windows x64 build
-        shell: bash
+        shell: pwsh
         run: |
-          mkdir -p dist/win64
-          cp -r release/win64/* dist/win64/
-          cd dist
-          zip -r ../eos-sdk-emu-win64.zip win64/
+          New-Item -ItemType Directory -Force -Path dist/win64
+          Copy-Item -Recurse release/win64/* dist/win64/
+          Compress-Archive -Path dist/win64 -DestinationPath eos-sdk-emu-win64.zip
 
       - name: Upload to Release
         if: github.event_name != 'pull_request' && (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v') || github.event_name == 'schedule' || github.event_name == 'workflow_dispatch')
@@ -294,12 +293,11 @@ jobs:
           fi
 
       - name: Package Windows x86 build
-        shell: bash
+        shell: pwsh
         run: |
-          mkdir -p dist/win32
-          cp -r release/win32/* dist/win32/
-          cd dist
-          zip -r ../eos-sdk-emu-win32.zip win32/
+          New-Item -ItemType Directory -Force -Path dist/win32
+          Copy-Item -Recurse release/win32/* dist/win32/
+          Compress-Archive -Path dist/win32 -DestinationPath eos-sdk-emu-win32.zip
 
       - name: Upload to Release
         if: github.event_name != 'pull_request' && (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v') || github.event_name == 'schedule' || github.event_name == 'workflow_dispatch')
