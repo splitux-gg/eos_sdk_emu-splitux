@@ -166,7 +166,9 @@ jobs:
 
       - name: Clone vcpkg
         if: steps.cache-vcpkg.outputs.cache-hit != 'true'
-        run: git clone https://github.com/microsoft/vcpkg.git
+        run: |
+          if (Test-Path vcpkg) { Remove-Item -Recurse -Force vcpkg }
+          git clone https://github.com/microsoft/vcpkg.git
 
       - name: Bootstrap vcpkg
         if: steps.cache-vcpkg.outputs.cache-hit != 'true'
@@ -252,7 +254,9 @@ jobs:
 
       - name: Clone vcpkg
         if: steps.cache-vcpkg.outputs.cache-hit != 'true'
-        run: git clone https://github.com/microsoft/vcpkg.git
+        run: |
+          if (Test-Path vcpkg) { Remove-Item -Recurse -Force vcpkg }
+          git clone https://github.com/microsoft/vcpkg.git
 
       - name: Bootstrap vcpkg
         if: steps.cache-vcpkg.outputs.cache-hit != 'true'
