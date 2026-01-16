@@ -82,6 +82,7 @@ jobs:
         with:
           name: windows-${{ matrix.arch }}
           path: release/win${{ matrix.arch == 'x64' && '64' || '32' }}/
+          retention-days: 30
 
   build-linux:
     runs-on: ubuntu-latest
@@ -146,6 +147,7 @@ jobs:
         with:
           name: linux-64
           path: release/linux64/
+          retention-days: 30
 
   package:
     needs: [build-windows, build-linux]
@@ -174,6 +176,7 @@ jobs:
         with:
           name: eos-sdk-emu-splitux
           path: dist/
+          retention-days: 30
         if: hashFiles('dist/**') != ''
 
   release:
