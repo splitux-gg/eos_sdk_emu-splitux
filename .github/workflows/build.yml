@@ -136,7 +136,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   build-windows-x64:
-    runs-on: windows-latest
+    runs-on: [self-hosted, Windows, X64]
     needs: [build-linux]
     if: always() && needs.build-linux.result == 'success'
 
@@ -223,7 +223,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   build-windows-x86:
-    runs-on: windows-latest
+    runs-on: [self-hosted, Windows, X64]
     needs: [build-windows-x64]
     if: always() && needs.build-windows-x64.result == 'success'
 
