@@ -1,0 +1,153 @@
+when:
+  - event: push
+    branch: main
+  - event: tag
+  - event: cron
+  - event: manual
+
+labels:
+  platform: linux
+
+skip_clone: true
+
+steps:
+  # === CLEANUP (nightly/manual only) ===
+  cleanup-nightly:
+    image: alpine/git
+    commands:
+      - apk add --no-cache github-cli
+      - |
+        if [ "$CI_PIPELINE_EVENT" = "tag" ]; then
+          echo "Tagged release - skipping cleanup"
+          exit 0
+        fi
+      - gh release delete nightly --yes --repo "$CI_REPO" || true
+      - gh api -X DELETE "repos/$CI_REPO/git/refs/tags/nightly" || true
+    environment:
+      GH_TOKEN:
+        from_secret: github_token
+    when:
+      - event: [cron, manual]
+
+  # === LINUX BUILD ===
+  build-linux:
+    image: ubuntu:22.04
+    commands:
+      # Clone repo
+      - apt-get update && apt-get install -y git curl zip unzip tar cmake build-essential pkg-config
+      - git clone --depth=1 --branch="$CI_COMMIT_BRANCH" "https://$GITHUB_TOKEN@github.com/$CI_REPO.git" . || git clone --depth=1 "https://$GITHUB_TOKEN@github.com/$CI_REPO.git" .
+      - git checkout "$CI_COMMIT_SHA" || true
+      # vcpkg setup (cached on host at /opt/vcpkg-cache)
+      - |
+        if [ ! -d "/opt/vcpkg-cache/vcpkg" ]; then
+          git clone https://github.com/microsoft/vcpkg.git /opt/vcpkg-cache/vcpkg
+          /opt/vcpkg-cache/vcpkg/bootstrap-vcpkg.sh
+        fi
+      - /opt/vcpkg-cache/vcpkg/vcpkg install protobuf:x64-linux nlohmann-json:x64-linux
+      # Build
+      - cmake -B build -S . -DCMAKE_TOOLCHAIN_FILE=/opt/vcpkg-cache/vcpkg/scripts/buildsystems/vcpkg.cmake -DVCPKG_TARGET_TRIPLET=x64-linux -DX64=ON -DCMAKE_BUILD_TYPE=Release
+      - cmake --build build --config Release
+      - cmake --install build --config Release
+      # Package
+      - mkdir -p dist/linux64 && cp -r release/linux64/* dist/linux64/
+      - cd dist && zip -r ../eos-sdk-emu-linux64.zip linux64/
+      # Upload to GitHub Release
+      - |
+        apt-get install -y github-cli
+        if [ "$CI_PIPELINE_EVENT" = "tag" ]; then
+          TAG="$CI_COMMIT_TAG"
+          PRERELEASE=""
+        else
+          TAG="nightly"
+          PRERELEASE="--prerelease"
+        fi
+        gh release upload "$TAG" eos-sdk-emu-linux64.zip --repo "$CI_REPO" --clobber || \
+          gh release create "$TAG" eos-sdk-emu-linux64.zip --repo "$CI_REPO" $PRERELEASE --title "EOS SDK Emu Splitux $TAG"
+    environment:
+      GITHUB_TOKEN:
+        from_secret: github_token
+      GH_TOKEN:
+        from_secret: github_token
+    volumes:
+      - /opt/vcpkg-cache:/opt/vcpkg-cache
+    when:
+      - event: [push, tag, cron, manual]
+
+  # === WINDOWS x64 BUILD ===
+  build-windows-x64:
+    image: bash  # Placeholder - runs natively via local backend
+    labels:
+      platform: windows
+    backend: local
+    commands:
+      # Clone repo
+      - git clone --depth=1 --branch="%CI_COMMIT_BRANCH%" "https://%GITHUB_TOKEN%@github.com/%CI_REPO%.git" . || git clone --depth=1 "https://%GITHUB_TOKEN%@github.com/%CI_REPO%.git" .
+      - git checkout "%CI_COMMIT_SHA%" || echo "Already at commit"
+      # vcpkg (persistent cache at C:\vcpkg)
+      - |
+        if not exist "C:\vcpkg\vcpkg.exe" (
+          git clone https://github.com/microsoft/vcpkg.git C:\vcpkg
+          C:\vcpkg\bootstrap-vcpkg.bat
+        )
+      - C:\vcpkg\vcpkg install protobuf:x64-windows-static nlohmann-json:x64-windows-static
+      # Build with MSVC
+      - cmake -B build -S . -A x64 -DCMAKE_TOOLCHAIN_FILE=C:\vcpkg\scripts\buildsystems\vcpkg.cmake -DVCPKG_TARGET_TRIPLET=x64-windows-static -DX64=ON -DCMAKE_BUILD_TYPE=Release
+      - cmake --build build --config Release
+      - cmake --install build --config Release
+      # Package
+      - mkdir dist\win64
+      - xcopy /E /I release\win64\* dist\win64\
+      - powershell Compress-Archive -Path dist\win64 -DestinationPath eos-sdk-emu-win64.zip
+      # Upload
+      - |
+        if "%CI_PIPELINE_EVENT%"=="tag" (
+          set TAG=%CI_COMMIT_TAG%
+        ) else (
+          set TAG=nightly
+        )
+        gh release upload %TAG% eos-sdk-emu-win64.zip --repo %CI_REPO% --clobber
+    environment:
+      GITHUB_TOKEN:
+        from_secret: github_token
+      GH_TOKEN:
+        from_secret: github_token
+    depends_on: [build-linux]
+    when:
+      - event: [push, tag, cron, manual]
+
+  # === WINDOWS x86 BUILD ===
+  build-windows-x86:
+    image: bash
+    labels:
+      platform: windows
+    backend: local
+    commands:
+      # Clone repo
+      - git clone --depth=1 --branch="%CI_COMMIT_BRANCH%" "https://%GITHUB_TOKEN%@github.com/%CI_REPO%.git" . || git clone --depth=1 "https://%GITHUB_TOKEN%@github.com/%CI_REPO%.git" .
+      - git checkout "%CI_COMMIT_SHA%" || echo "Already at commit"
+      # vcpkg x86
+      - C:\vcpkg\vcpkg install protobuf:x86-windows-static nlohmann-json:x86-windows-static
+      # Build with MSVC (32-bit)
+      - cmake -B build -S . -A Win32 -DCMAKE_TOOLCHAIN_FILE=C:\vcpkg\scripts\buildsystems\vcpkg.cmake -DVCPKG_TARGET_TRIPLET=x86-windows-static -DX86=ON -DCMAKE_BUILD_TYPE=Release
+      - cmake --build build --config Release
+      - cmake --install build --config Release
+      # Package
+      - mkdir dist\win32
+      - xcopy /E /I release\win32\* dist\win32\
+      - powershell Compress-Archive -Path dist\win32 -DestinationPath eos-sdk-emu-win32.zip
+      # Upload
+      - |
+        if "%CI_PIPELINE_EVENT%"=="tag" (
+          set TAG=%CI_COMMIT_TAG%
+        ) else (
+          set TAG=nightly
+        )
+        gh release upload %TAG% eos-sdk-emu-win32.zip --repo %CI_REPO% --clobber
+    environment:
+      GITHUB_TOKEN:
+        from_secret: github_token
+      GH_TOKEN:
+        from_secret: github_token
+    depends_on: [build-windows-x64]
+    when:
+      - event: [push, tag, cron, manual]
