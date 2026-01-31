@@ -1,56 +1,36 @@
-.vs
-*.vcxproj*
-nemirtingas_epic_emu*
-/Debug
-/Release
-/x64
+# Build artifacts
+build/
+build-win64/
+*.o
+*.obj
+*.dll
+*.so
+*.dylib
+*.exe
+*.lib
+*.exp
+*.pdb
+*.ilk
 
-/dll_tester/OUT
+# SDK binaries (keep headers only)
+SDK/Bin/
+SDK/Lib/
+SDK/Tools/
 
-/proto/network_proto.pb*
-/extra/protobuf/protobuf-src
-/extra/protobuf/win32
-/extra/protobuf/win64
-/extra/protobuf/linux32
-/extra/protobuf/linux64
-/extra/protobuf/macosx32
-/extra/protobuf/macosx64
-/extra/glew/glew-src
-/extra/glew/win32
-/extra/glew/win64
-/extra/glew/linux32
-/extra/glew/linux64
-/extra/curl/curl-src
-/extra/curl/win32
-/extra/curl/win64
-/extra/curl/linux32
-/extra/curl/linux64
-/extra/zstd/zstd-src
-/extra/zstd/win32
-/extra/zstd/win64
-/extra/zstd/linux32
-/extra/zstd/linux64
-/extra/zstd/macosx32
-/extra/zstd/macosx64
-/win32
-/win64
-/linux32
-/linux64
-/macosx32
-/macosx64
+# IDE
+.vs/
+.vscode/
+*.swp
+*.swo
+*~
+.idea/
 
-/NemirtingasEmuLauncher/.vs
-/NemirtingasEmuLauncher/bin
-/NemirtingasEmuLauncher/obj
-/NemirtingasEmuLauncher/packages
-/packages
+# Logs
+*.log
 
-/OUT
-/NewEmuLauncher
-/NemirUtilities
+# OS
+.DS_Store
+Thumbs.db
 
-# Local build directories
-/build-local
-/build-mingw
-/build-test
-/build
+# Samples build artifacts
+Samples/*/build/

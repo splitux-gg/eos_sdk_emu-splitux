@@ -7,99 +7,42 @@ on:
       - 'v*'
   pull_request:
     branches: [main]
-  schedule:
-    - cron: '0 5 * * *'  # Daily at 5 AM UTC
   workflow_dispatch:
 
 permissions:
   contents: write
 
-env:
-  VCPKG_BINARY_SOURCES: "clear;x-gha,readwrite"
-
 jobs:
-  # Cleanup nightly release if this is a scheduled/dispatch build
-  cleanup-nightly:
-    runs-on: ubuntu-latest
-    if: github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && !startsWith(github.ref, 'refs/tags/v'))
-    steps:
-      - name: Delete existing nightly release
-        run: |
-          gh release delete nightly --yes --repo ${{ github.repository }} || true
-          gh api -X DELETE repos/${{ github.repository }}/git/refs/tags/nightly || true
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-  build-linux:
-    runs-on: [self-hosted, splitux, linux]
-    needs: [cleanup-nightly]
-    if: always() && (needs.cleanup-nightly.result == 'success' || needs.cleanup-nightly.result == 'skipped')
+  build-windows-x64:
+    runs-on: [self-hosted, splitux, windows]
 
     steps:
       - uses: actions/checkout@v4
 
-      - name: Export GitHub Actions cache variables
-        uses: actions/github-script@v7
+      - name: Setup MSVC
+        uses: ilammy/msvc-dev-cmd@v1
         with:
-          script: |
-            core.exportVariable('ACTIONS_CACHE_URL', process.env.ACTIONS_CACHE_URL || '');
-            core.exportVariable('ACTIONS_RUNTIME_TOKEN', process.env.ACTIONS_RUNTIME_TOKEN || '');
-
-      - name: Install build tools
-        run: |
-          sudo pacman -Sy --noconfirm cmake base-devel curl zip unzip tar
-
-      - name: Cache vcpkg
-        uses: actions/cache@v4
-        id: cache-vcpkg
-        with:
-          path: |
-            vcpkg
-            !vcpkg/.git
-          key: vcpkg-linux-x64-${{ hashFiles('.github/workflows/build.yml') }}
-          restore-keys: |
-            vcpkg-linux-x64-
-
-      - name: Clone vcpkg
-        if: steps.cache-vcpkg.outputs.cache-hit != 'true'
-        run: |
-          rm -rf vcpkg || true
-          git clone https://github.com/microsoft/vcpkg.git
-
-      - name: Bootstrap vcpkg
-        if: steps.cache-vcpkg.outputs.cache-hit != 'true'
-        run: ./vcpkg/bootstrap-vcpkg.sh
-
-      - name: Install dependencies
-        run: |
-          ./vcpkg/vcpkg install protobuf:x64-linux
-          ./vcpkg/vcpkg install nlohmann-json:x64-linux
+          arch: x64
 
       - name: Configure CMake
         run: |
-          cmake -B build -S . \
-            -DCMAKE_TOOLCHAIN_FILE="${{ github.workspace }}/vcpkg/scripts/buildsystems/vcpkg.cmake" \
-            -DVCPKG_TARGET_TRIPLET=x64-linux \
-            -DX64=ON \
-            -DCMAKE_BUILD_TYPE=Release
+          cmake -B build -G "Visual Studio 17 2022" -A x64
 
       - name: Build
         run: cmake --build build --config Release
 
-      - name: Install
-        run: cmake --install build --config Release
-
       - name: Get version info
         id: version
+        shell: bash
         run: |
           if [[ "${{ github.ref }}" == refs/tags/v* ]]; then
             VERSION="${{ github.ref_name }}"
-            RELEASE_NAME="EOS SDK Emu Splitux ${VERSION}"
+            RELEASE_NAME="EOS SDK LAN Emulator ${VERSION}"
             IS_NIGHTLY="false"
             PRERELEASE="false"
           else
             VERSION="nightly"
-            RELEASE_NAME="EOS SDK Emu Splitux Nightly ($(date +%Y-%m-%d))"
+            RELEASE_NAME="EOS SDK LAN Emulator Nightly ($(date +%Y-%m-%d))"
             IS_NIGHTLY="true"
             PRERELEASE="true"
           fi
@@ -108,202 +51,25 @@ jobs:
           echo "is_nightly=$IS_NIGHTLY" >> $GITHUB_OUTPUT
           echo "prerelease=$PRERELEASE" >> $GITHUB_OUTPUT
 
-      - name: Package Linux build
+      - name: Package
+        shell: pwsh
         run: |
-          mkdir -p dist/linux64
-          cp -r release/linux64/* dist/linux64/
-          cd dist
-          zip -r ../eos-sdk-emu-linux64.zip linux64/
+          New-Item -ItemType Directory -Force -Path dist
+          Copy-Item build/Release/EOSSDK-Win64-Shipping.dll dist/
+          Compress-Archive -Path dist/EOSSDK-Win64-Shipping.dll -DestinationPath eos-lan-win64.zip
 
       - name: Upload to Release
-        if: github.event_name != 'pull_request' && (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v') || github.event_name == 'schedule' || github.event_name == 'workflow_dispatch')
+        if: github.event_name != 'pull_request' && (startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch')
         uses: softprops/action-gh-release@v2
         with:
           name: ${{ steps.version.outputs.release_name }}
           tag_name: ${{ steps.version.outputs.is_nightly == 'true' && 'nightly' || github.ref_name }}
           prerelease: ${{ steps.version.outputs.prerelease }}
           body: |
-            EOS SDK Emulator for Splitux split-screen gaming.
+            EOS SDK LAN Emulator for split-screen multiplayer.
 
-            **Included binaries:**
-            - `linux64/libEOSSDK-Linux-Shipping.so` - Linux 64-bit
-            - `win64/EOSSDK-Win64-Shipping.dll` - Windows 64-bit
-            - `win32/EOSSDK-Win32-Shipping.dll` - Windows 32-bit
-          files: eos-sdk-emu-linux64.zip
-          fail_on_unmatched_files: false
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-  build-windows-x64:
-    runs-on: [self-hosted, Windows, X64]
-    needs: [build-linux]
-    if: always() && needs.build-linux.result == 'success'
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Export GitHub Actions cache variables
-        uses: actions/github-script@v7
-        with:
-          script: |
-            core.exportVariable('ACTIONS_CACHE_URL', process.env.ACTIONS_CACHE_URL || '');
-            core.exportVariable('ACTIONS_RUNTIME_TOKEN', process.env.ACTIONS_RUNTIME_TOKEN || '');
-
-      - name: Setup MSVC
-        uses: microsoft/setup-msbuild@v2
-
-      - name: Cache vcpkg
-        uses: actions/cache@v4
-        id: cache-vcpkg
-        with:
-          path: |
-            vcpkg
-            !vcpkg/.git
-          key: vcpkg-windows-x64-${{ hashFiles('.github/workflows/build.yml') }}
-          restore-keys: |
-            vcpkg-windows-x64-
-
-      - name: Clone vcpkg
-        if: steps.cache-vcpkg.outputs.cache-hit != 'true'
-        run: |
-          if (Test-Path vcpkg) { Remove-Item -Recurse -Force vcpkg }
-          git clone https://github.com/microsoft/vcpkg.git
-
-      - name: Bootstrap vcpkg
-        if: steps.cache-vcpkg.outputs.cache-hit != 'true'
-        run: .\vcpkg\bootstrap-vcpkg.bat
-        shell: cmd
-
-      - name: Install dependencies
-        run: |
-          .\vcpkg\vcpkg install protobuf:x64-windows-static
-          .\vcpkg\vcpkg install nlohmann-json:x64-windows-static
-
-      - name: Configure CMake
-        run: |
-          cmake -B build -S . `
-            -A x64 `
-            -DCMAKE_TOOLCHAIN_FILE="${{ github.workspace }}/vcpkg/scripts/buildsystems/vcpkg.cmake" `
-            -DVCPKG_TARGET_TRIPLET=x64-windows-static `
-            -DX64=ON `
-            -DCMAKE_BUILD_TYPE=Release
-
-      - name: Build
-        run: cmake --build build --config Release
-
-      - name: Install
-        run: cmake --install build --config Release
-
-      - name: Get version info
-        id: version
-        shell: bash
-        run: |
-          if [[ "${{ github.ref }}" == refs/tags/v* ]]; then
-            echo "is_nightly=false" >> $GITHUB_OUTPUT
-          else
-            echo "is_nightly=true" >> $GITHUB_OUTPUT
-          fi
-
-      - name: Package Windows x64 build
-        shell: pwsh
-        run: |
-          New-Item -ItemType Directory -Force -Path dist/win64
-          Copy-Item -Recurse release/win64/* dist/win64/
-          Compress-Archive -Path dist/win64 -DestinationPath eos-sdk-emu-win64.zip
-
-      - name: Upload to Release
-        if: github.event_name != 'pull_request' && (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v') || github.event_name == 'schedule' || github.event_name == 'workflow_dispatch')
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: ${{ steps.version.outputs.is_nightly == 'true' && 'nightly' || github.ref_name }}
-          files: eos-sdk-emu-win64.zip
-          fail_on_unmatched_files: false
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-  build-windows-x86:
-    runs-on: [self-hosted, Windows, X64]
-    needs: [build-windows-x64]
-    if: always() && needs.build-windows-x64.result == 'success'
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Export GitHub Actions cache variables
-        uses: actions/github-script@v7
-        with:
-          script: |
-            core.exportVariable('ACTIONS_CACHE_URL', process.env.ACTIONS_CACHE_URL || '');
-            core.exportVariable('ACTIONS_RUNTIME_TOKEN', process.env.ACTIONS_RUNTIME_TOKEN || '');
-
-      - name: Setup MSVC
-        uses: microsoft/setup-msbuild@v2
-
-      - name: Cache vcpkg
-        uses: actions/cache@v4
-        id: cache-vcpkg
-        with:
-          path: |
-            vcpkg
-            !vcpkg/.git
-          key: vcpkg-windows-x86-${{ hashFiles('.github/workflows/build.yml') }}
-          restore-keys: |
-            vcpkg-windows-x86-
-
-      - name: Clone vcpkg
-        if: steps.cache-vcpkg.outputs.cache-hit != 'true'
-        run: |
-          if (Test-Path vcpkg) { Remove-Item -Recurse -Force vcpkg }
-          git clone https://github.com/microsoft/vcpkg.git
-
-      - name: Bootstrap vcpkg
-        if: steps.cache-vcpkg.outputs.cache-hit != 'true'
-        run: .\vcpkg\bootstrap-vcpkg.bat
-        shell: cmd
-
-      - name: Install dependencies
-        run: |
-          .\vcpkg\vcpkg install protobuf:x86-windows-static
-          .\vcpkg\vcpkg install nlohmann-json:x86-windows-static
-
-      - name: Configure CMake
-        run: |
-          cmake -B build -S . `
-            -A Win32 `
-            -DCMAKE_TOOLCHAIN_FILE="${{ github.workspace }}/vcpkg/scripts/buildsystems/vcpkg.cmake" `
-            -DVCPKG_TARGET_TRIPLET=x86-windows-static `
-            -DX86=ON `
-            -DCMAKE_BUILD_TYPE=Release
-
-      - name: Build
-        run: cmake --build build --config Release
-
-      - name: Install
-        run: cmake --install build --config Release
-
-      - name: Get version info
-        id: version
-        shell: bash
-        run: |
-          if [[ "${{ github.ref }}" == refs/tags/v* ]]; then
-            echo "is_nightly=false" >> $GITHUB_OUTPUT
-          else
-            echo "is_nightly=true" >> $GITHUB_OUTPUT
-          fi
-
-      - name: Package Windows x86 build
-        shell: pwsh
-        run: |
-          New-Item -ItemType Directory -Force -Path dist/win32
-          Copy-Item -Recurse release/win32/* dist/win32/
-          Compress-Archive -Path dist/win32 -DestinationPath eos-sdk-emu-win32.zip
-
-      - name: Upload to Release
-        if: github.event_name != 'pull_request' && (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v') || github.event_name == 'schedule' || github.event_name == 'workflow_dispatch')
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: ${{ steps.version.outputs.is_nightly == 'true' && 'nightly' || github.ref_name }}
-          files: eos-sdk-emu-win32.zip
+            Drop-in replacement for `EOSSDK-Win64-Shipping.dll` - enables LAN play without Epic servers.
+          files: eos-lan-win64.zip
           fail_on_unmatched_files: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
