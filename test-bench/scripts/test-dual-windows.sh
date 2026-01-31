@@ -6,7 +6,7 @@ set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_DIR="$(dirname "$(dirname "$SCRIPT_DIR")")"
-VM_HOST="winvm"
+VM_HOST="compute-local"
 BUILD_DIR="C:/Code/eos-lan/build/Release"
 LOG_DIR="C:/Code/eos-lan/test-bench/logs"
 LOCAL_LOG_DIR="$PROJECT_DIR/test-bench/logs"
