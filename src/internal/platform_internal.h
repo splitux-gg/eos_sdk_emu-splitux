@@ -10,6 +10,7 @@
 // Forward declarations of internal state structures
 typedef struct ConnectState ConnectState;
 typedef struct SessionsState SessionsState;
+typedef struct LobbyState LobbyState;
 typedef struct P2PState P2PState;
 typedef struct CallbackQueue CallbackQueue;
 
@@ -23,6 +24,7 @@ typedef struct PlatformState {
     // Subsystem handles
     ConnectState* connect;
     SessionsState* sessions;
+    LobbyState* lobby;
     P2PState* p2p;
 
     // Callback queue

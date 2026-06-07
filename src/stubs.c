@@ -56,11 +56,6 @@ EOS_DECLARE_FUNC(EOS_HUI) EOS_Platform_GetUIInterface(EOS_HPlatform Handle) {
     return (EOS_HUI)Handle;
 }
 
-EOS_DECLARE_FUNC(EOS_HLobby) EOS_Platform_GetLobbyInterface(EOS_HPlatform Handle) {
-    EOS_LOG_API_ENTER();
-    return (EOS_HLobby)Handle;
-}
-
 EOS_DECLARE_FUNC(EOS_EResult) EOS_Platform_CheckForLauncherAndRestart(EOS_HPlatform Handle) {
     EOS_LOG_API_ENTER();
     EOS_LOG_API_RETURN(EOS_Success);

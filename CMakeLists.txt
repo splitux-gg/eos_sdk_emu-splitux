@@ -23,6 +23,10 @@ set(SOURCES
     src/session_modification.c
     src/session_search.c
     src/session_details.c
+    src/lobby.c
+    src/lobby_modification.c
+    src/lobby_search.c
+    src/lobby_details.c
     src/p2p.c
 )
 
