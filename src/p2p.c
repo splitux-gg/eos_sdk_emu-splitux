@@ -206,7 +206,16 @@ static EOS_ProductUserId p2p_local_puid(P2PState* state) {
     if (state->local_user) return state->local_user;
     ConnectState* cs = state->platform->connect;
     if (!cs) return NULL;
-    for (int i = 0; i < MAX_LOCAL_USERS; i++) {
+    // Return the MOST-RECENT logged-in user, not the first. Palworld does an
+    // anonymous Connect_Login first (slot 0) and then a Steam-authenticated one
+    // (slot 1); it runs the lobby and all P2P networking under that *second*
+    // identity. The lobby owner/member PUIDs - and therefore the RemoteUserId
+    // the peer addresses us by - are the Steam PUID. If we stamped our wire
+    // sender_id with slot 0 instead, the peer's CONNECT/ACCEPT/DATA could never
+    // be matched to the connection it is actually trying to establish (it would
+    // ESTABLISH a throwaway conn under the wrong id while the real one spun on
+    // REQUESTING forever). Iterate backwards so we hand back the Steam login.
+    for (int i = MAX_LOCAL_USERS - 1; i >= 0; i--) {
         if (cs->users[i].in_use && cs->users[i].status == EOS_LS_LoggedIn) {
             return (EOS_ProductUserId)&cs->users[i].user_id;
         }
