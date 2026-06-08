@@ -133,7 +133,7 @@ EOS_DECLARE_FUNC(EOS_ProductUserId) EOS_LobbyDetails_GetLobbyOwner(
         return NULL;
     }
 
-    if (!Options || Options->ApiVersion != EOS_LOBBYDETAILS_GETLOBBYOWNER_API_LATEST) {
+    if (!Options) {
         return NULL;
     }
 
@@ -151,7 +151,7 @@ EOS_DECLARE_FUNC(EOS_EResult) EOS_LobbyDetails_CopyInfo(
         return EOS_InvalidParameters;
     }
 
-    if (!Options || Options->ApiVersion != EOS_LOBBYDETAILS_COPYINFO_API_LATEST) {
+    if (!Options) {
         return EOS_InvalidParameters;
     }
 
@@ -178,7 +178,7 @@ EOS_DECLARE_FUNC(uint32_t) EOS_LobbyDetails_GetAttributeCount(
         return 0;
     }
 
-    if (!Options || Options->ApiVersion != EOS_LOBBYDETAILS_GETATTRIBUTECOUNT_API_LATEST) {
+    if (!Options) {
         return 0;
     }
 
@@ -196,7 +196,7 @@ EOS_DECLARE_FUNC(EOS_EResult) EOS_LobbyDetails_CopyAttributeByIndex(
         return EOS_InvalidParameters;
     }
 
-    if (!Options || Options->ApiVersion != EOS_LOBBYDETAILS_COPYATTRIBUTEBYINDEX_API_LATEST) {
+    if (!Options) {
         return EOS_InvalidParameters;
     }
 
@@ -223,7 +223,7 @@ EOS_DECLARE_FUNC(EOS_EResult) EOS_LobbyDetails_CopyAttributeByKey(
         return EOS_InvalidParameters;
     }
 
-    if (!Options || Options->ApiVersion != EOS_LOBBYDETAILS_COPYATTRIBUTEBYKEY_API_LATEST) {
+    if (!Options) {
         return EOS_InvalidParameters;
     }
 
@@ -250,7 +250,7 @@ EOS_DECLARE_FUNC(uint32_t) EOS_LobbyDetails_GetMemberCount(
         return 0;
     }
 
-    if (!Options || Options->ApiVersion != EOS_LOBBYDETAILS_GETMEMBERCOUNT_API_LATEST) {
+    if (!Options) {
         return 0;
     }
 
@@ -267,7 +267,7 @@ EOS_DECLARE_FUNC(EOS_ProductUserId) EOS_LobbyDetails_GetMemberByIndex(
         return NULL;
     }
 
-    if (!Options || Options->ApiVersion != EOS_LOBBYDETAILS_GETMEMBERBYINDEX_API_LATEST) {
+    if (!Options) {
         return NULL;
     }
 
@@ -288,7 +288,7 @@ EOS_DECLARE_FUNC(uint32_t) EOS_LobbyDetails_GetMemberAttributeCount(
         return 0;
     }
 
-    if (!Options || Options->ApiVersion != EOS_LOBBYDETAILS_GETMEMBERATTRIBUTECOUNT_API_LATEST) {
+    if (!Options) {
         return 0;
     }
 
@@ -311,7 +311,7 @@ EOS_DECLARE_FUNC(EOS_EResult) EOS_LobbyDetails_CopyMemberAttributeByIndex(
         return EOS_InvalidParameters;
     }
 
-    if (!Options || Options->ApiVersion != EOS_LOBBYDETAILS_COPYMEMBERATTRIBUTEBYINDEX_API_LATEST) {
+    if (!Options) {
         return EOS_InvalidParameters;
     }
 
@@ -342,7 +342,7 @@ EOS_DECLARE_FUNC(EOS_EResult) EOS_LobbyDetails_CopyMemberAttributeByKey(
         return EOS_InvalidParameters;
     }
 
-    if (!Options || Options->ApiVersion != EOS_LOBBYDETAILS_COPYMEMBERATTRIBUTEBYKEY_API_LATEST) {
+    if (!Options) {
         return EOS_InvalidParameters;
     }
 

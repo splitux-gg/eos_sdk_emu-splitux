@@ -60,7 +60,7 @@ EOS_DECLARE_FUNC(EOS_EResult) EOS_LobbyModification_SetBucketId(
         return EOS_InvalidParameters;
     }
 
-    if (!Options || Options->ApiVersion != EOS_LOBBYMODIFICATION_SETBUCKETID_API_LATEST) {
+    if (!Options) {
         return EOS_InvalidParameters;
     }
 
@@ -84,7 +84,7 @@ EOS_DECLARE_FUNC(EOS_EResult) EOS_LobbyModification_SetPermissionLevel(
         return EOS_InvalidParameters;
     }
 
-    if (!Options || Options->ApiVersion != EOS_LOBBYMODIFICATION_SETPERMISSIONLEVEL_API_LATEST) {
+    if (!Options) {
         return EOS_InvalidParameters;
     }
 
@@ -103,7 +103,7 @@ EOS_DECLARE_FUNC(EOS_EResult) EOS_LobbyModification_SetMaxMembers(
         return EOS_InvalidParameters;
     }
 
-    if (!Options || Options->ApiVersion != EOS_LOBBYMODIFICATION_SETMAXMEMBERS_API_LATEST) {
+    if (!Options) {
         return EOS_InvalidParameters;
     }
 
@@ -126,7 +126,7 @@ EOS_DECLARE_FUNC(EOS_EResult) EOS_LobbyModification_SetInvitesAllowed(
         return EOS_InvalidParameters;
     }
 
-    if (!Options || Options->ApiVersion != EOS_LOBBYMODIFICATION_SETINVITESALLOWED_API_LATEST) {
+    if (!Options) {
         return EOS_InvalidParameters;
     }
 
@@ -195,7 +195,7 @@ EOS_DECLARE_FUNC(EOS_EResult) EOS_LobbyModification_RemoveAttribute(
         return EOS_InvalidParameters;
     }
 
-    if (!Options || Options->ApiVersion != EOS_LOBBYMODIFICATION_REMOVEATTRIBUTE_API_LATEST) {
+    if (!Options) {
         return EOS_InvalidParameters;
     }
 
@@ -228,7 +228,7 @@ EOS_DECLARE_FUNC(EOS_EResult) EOS_LobbyModification_AddMemberAttribute(
         return EOS_InvalidParameters;
     }
 
-    if (!Options || Options->ApiVersion != EOS_LOBBYMODIFICATION_ADDMEMBERATTRIBUTE_API_LATEST) {
+    if (!Options) {
         return EOS_InvalidParameters;
     }
 
@@ -272,7 +272,7 @@ EOS_DECLARE_FUNC(EOS_EResult) EOS_LobbyModification_RemoveMemberAttribute(
         return EOS_InvalidParameters;
     }
 
-    if (!Options || Options->ApiVersion != EOS_LOBBYMODIFICATION_REMOVEMEMBERATTRIBUTE_API_LATEST) {
+    if (!Options) {
         return EOS_InvalidParameters;
     }
 

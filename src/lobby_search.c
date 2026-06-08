@@ -96,7 +96,7 @@ EOS_DECLARE_FUNC(EOS_EResult) EOS_LobbySearch_SetLobbyId(
         return EOS_InvalidParameters;
     }
 
-    if (!Options || Options->ApiVersion != EOS_LOBBYSEARCH_SETLOBBYID_API_LATEST) {
+    if (!Options) {
         return EOS_InvalidParameters;
     }
 
@@ -120,7 +120,7 @@ EOS_DECLARE_FUNC(EOS_EResult) EOS_LobbySearch_SetTargetUserId(
         return EOS_InvalidParameters;
     }
 
-    if (!Options || Options->ApiVersion != EOS_LOBBYSEARCH_SETTARGETUSERID_API_LATEST) {
+    if (!Options) {
         return EOS_InvalidParameters;
     }
 
@@ -143,7 +143,7 @@ EOS_DECLARE_FUNC(EOS_EResult) EOS_LobbySearch_SetParameter(
         return EOS_InvalidParameters;
     }
 
-    if (!Options || Options->ApiVersion != EOS_LOBBYSEARCH_SETPARAMETER_API_LATEST) {
+    if (!Options) {
         return EOS_InvalidParameters;
     }
 
@@ -199,7 +199,7 @@ EOS_DECLARE_FUNC(EOS_EResult) EOS_LobbySearch_RemoveParameter(
         return EOS_InvalidParameters;
     }
 
-    if (!Options || Options->ApiVersion != EOS_LOBBYSEARCH_REMOVEPARAMETER_API_LATEST) {
+    if (!Options) {
         return EOS_InvalidParameters;
     }
 
@@ -233,7 +233,7 @@ EOS_DECLARE_FUNC(EOS_EResult) EOS_LobbySearch_SetMaxResults(
         return EOS_InvalidParameters;
     }
 
-    if (!Options || Options->ApiVersion != EOS_LOBBYSEARCH_SETMAXRESULTS_API_LATEST) {
+    if (!Options) {
         return EOS_InvalidParameters;
     }
 
@@ -263,7 +263,7 @@ EOS_DECLARE_FUNC(void) EOS_LobbySearch_Find(
         goto queue_callback;
     }
 
-    if (!Options || Options->ApiVersion != EOS_LOBBYSEARCH_FIND_API_LATEST) {
+    if (!Options) {
         goto queue_callback;
     }
 
@@ -405,7 +405,7 @@ EOS_DECLARE_FUNC(uint32_t) EOS_LobbySearch_GetSearchResultCount(
         return 0;
     }
 
-    if (!Options || Options->ApiVersion != EOS_LOBBYSEARCH_GETSEARCHRESULTCOUNT_API_LATEST) {
+    if (!Options) {
         return 0;
     }
 
@@ -427,7 +427,7 @@ EOS_DECLARE_FUNC(EOS_EResult) EOS_LobbySearch_CopySearchResultByIndex(
         return EOS_InvalidParameters;
     }
 
-    if (!Options || Options->ApiVersion != EOS_LOBBYSEARCH_COPYSEARCHRESULTBYINDEX_API_LATEST) {
+    if (!Options) {
         return EOS_InvalidParameters;
     }
 
