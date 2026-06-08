@@ -308,13 +308,14 @@ EOS_DECLARE_FUNC(void) EOS_LobbySearch_Find(
         }
     }
 
-    // DIAGNOSTIC: dump the search criteria so we can see exactly what the game asked for
-    EOS_LOG_INFO("LobbySearch_Find: criteria max_results=%d target_lobby_id='%s' target_user_id=%s param_count=%d ; discovered_lobby_count=%d",
+    // Dump the search criteria (verbose - DEBUG only; invaluable when bringing
+    // up a new game's search params, but noise in a normal co-op run).
+    EOS_LOG_DEBUG("LobbySearch_Find: criteria max_results=%d target_lobby_id='%s' target_user_id=%s param_count=%d ; discovered_lobby_count=%d",
                  (int)search->max_results, search->target_lobby_id,
                  search->target_user_id ? "(set)" : "(null)",
                  search->param_count, state->discovered_lobby_count);
     for (int p = 0; p < search->param_count; p++) {
-        EOS_LOG_INFO("LobbySearch_Find:   param[%d] key='%s' type=%d comparison=%d",
+        EOS_LOG_DEBUG("LobbySearch_Find:   param[%d] key='%s' type=%d comparison=%d",
                      p, search->params[p].key, (int)search->params[p].type,
                      (int)search->params[p].comparison);
     }
@@ -329,18 +330,18 @@ EOS_DECLARE_FUNC(void) EOS_LobbySearch_Find(
 
         EOS_LOG_INFO("LobbySearch_Find:   candidate[%d] id='%s' owner='%s' member_count=%d attribute_count=%d",
                      i, l->lobby_id, l->owner_id_string, l->member_count, l->attribute_count);
-        EOS_LOG_INFO("LobbySearch_Find:     cap: max_members=%u member_count=%d",
+        EOS_LOG_DEBUG("LobbySearch_Find:     cap: max_members=%u member_count=%d",
                      l->max_members, l->member_count);
         for (int a = 0; a < l->attribute_count; a++) {
             const LobbyAttribute* la = &l->attributes[a];
             if (la->type == EOS_AT_INT64) {
-                EOS_LOG_INFO("LobbySearch_Find:     attr '%s' = %lld (int64)",
+                EOS_LOG_DEBUG("LobbySearch_Find:     attr '%s' = %lld (int64)",
                              la->key, (long long)la->value.as_int64);
             } else if (la->type == EOS_AT_BOOLEAN) {
-                EOS_LOG_INFO("LobbySearch_Find:     attr '%s' = %d (bool)",
+                EOS_LOG_DEBUG("LobbySearch_Find:     attr '%s' = %d (bool)",
                              la->key, (int)la->value.as_bool);
             } else if (la->type == EOS_AT_STRING) {
-                EOS_LOG_INFO("LobbySearch_Find:     attr '%s' = '%s' (str)",
+                EOS_LOG_DEBUG("LobbySearch_Find:     attr '%s' = '%s' (str)",
                              la->key, la->value.as_string);
             }
         }

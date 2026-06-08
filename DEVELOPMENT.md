@@ -1,68 +1,52 @@
 # EOS-LAN Emulator Development Guide
 
-⚠️ **PRIMARY BUILD TARGET: Windows DLL Only**
+⚠️ **PRIMARY BUILD TARGET: Windows DLL** (`EOSSDK-Win64-Shipping.dll`)
 
-This document describes the development workflow for building the EOS-LAN emulator **natively on a Windows VM**. The emulator DLL is used by Proton/Gamescope for running Windows games on Linux.
+The emulator ships as a Windows DLL that Proton loads when running Windows games
+on Linux. **Builds happen in CI** — there is no local Windows toolchain and no
+Windows VM anymore. You edit C on Linux, push, and a self-hosted GitHub Actions
+runner produces the DLL.
 
----
-
-## Windows VM Development Environment
-
-### Quick Access
-
-```bash
-# SSH to Windows VM (alias configured in ~/.ssh/config)
-ssh winvm
-
-# Or direct access
-ssh WINDOWSISBALLS@192.168.122.100
-```
-
-### VM Details
-
-| Property | Value |
-|----------|-------|
-| **IP Address** | 192.168.122.100 |
-| **Username** | WINDOWSISBALLS |
-| **Authentication** | SSH key (~/.ssh/windows-vm) |
-| **OS** | Windows 11 25H2 |
-| **RAM** | 16 GB |
-| **CPUs** | 10 cores |
-
-### SSH Configuration
-
-Already configured in `~/.ssh/config` as multiple aliases:
-- `winvm`
-- `windows11-dev`
-- `vm`
-
-All three aliases work identically. See `/home/alphasigmachad/ssh-workspace/WINDOWS-VM.md` for detailed VM setup and troubleshooting.
+> Historical note: an earlier workflow rsync'd source to a Windows QEMU VM
+> (`winvm`, `192.168.122.100`) and built there with `make build-vm`. That VM is
+> **retired** — ignore any lingering `winvm`/`make *-vm` references below.
 
 ---
 
-## File Synchronization Workflow
+## Build Environment (GitHub Actions CI)
 
-### Development Workflow
+The Windows DLL is built by a **self-hosted GitHub Actions runner** on the
+`compute` host (`10.0.0.2`), labelled `[self-hosted, splitux, windows]`.
 
-Development happens on **Linux**, but builds happen on **Windows VM**:
+- Workflow: `.github/workflows/build.yml`
+- Toolchain: `ilammy/msvc-dev-cmd` (x64) → `cmake -G "Visual Studio 17 2022" -A x64` → Release
+- Output: `eos-lan-win64.zip`, uploaded to the `nightly` GitHub release (and as a run artifact)
+- Triggers: every push to `main`, plus `workflow_dispatch` on any branch
 
-1. **Edit code on Linux**: `/home/alphasigmachad/Code/eos-test/sdk/`
-2. **Sync to Windows VM**: `make sync-vm`
-3. **Build on Windows**: `make build-vm`
-4. **Or combined**: `make deploy-vm`
-
-### Manual Sync Commands
+### Build / fetch loop (the actual workflow)
 
 ```bash
-# Sync source code
-rsync -avz --delete ./src/ winvm:'C:/Code/eos-lan/src/'
+# 1. Edit src/*.c on Linux, then a fast local syntax gate (clangd -I errors in
+#    the editor are FALSE POSITIVES — gcc is the source of truth):
+gcc -std=gnu11 -I include -I src -fsyntax-only src/<file>.c
 
-# Sync headers
-rsync -avz --delete ./include/ winvm:'C:/Code/eos-lan/include/'
+# 2. Push and kick off a build for your branch:
+git push origin <branch>
+gh workflow run build.yml --ref <branch> -R splitux-gg/eos_sdk_emu-splitux
 
-# Sync CMake configuration
-rsync -avz ./CMakeLists.txt winvm:'C:/Code/eos-lan/'
+# 3. Wait for it (~25-30s) and confirm green:
+gh run watch <run-id> -R splitux-gg/eos_sdk_emu-splitux --exit-status
+
+# 4. Pull the built DLL from the nightly release:
+gh release download nightly -R splitux-gg/eos_sdk_emu-splitux -p eos-lan-win64.zip --clobber
+#    (the Palworld bench at ~/Code/eos-test/palworld-test/test-eos-lan.sh does this
+#     automatically via fetch_bin())
 ```
+
+> Sanity-check that you fetched the build you just pushed: the nightly asset's
+> `createdAt` should be newer than your `workflow run`, and
+> `strings EOSSDK-Win64-Shipping.dll | grep "<a-log-line-you-just-added>"` should
+> hit. A stale fetch silently tests old code.
 
 ### Makefile Targets
 

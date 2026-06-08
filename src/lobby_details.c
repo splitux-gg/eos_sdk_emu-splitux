@@ -277,7 +277,7 @@ EOS_DECLARE_FUNC(EOS_ProductUserId) EOS_LobbyDetails_GetMemberByIndex(
     }
 
     EOS_ProductUserId m = details->lobby.members[Options->MemberIndex].member_id;
-    EOS_LOG_INFO("LobbyDetails_GetMemberByIndex(%u) -> %s (member_count=%d)",
+    EOS_LOG_DEBUG("LobbyDetails_GetMemberByIndex(%u) -> %s (member_count=%d)",
                  Options->MemberIndex, m ? "valid" : "NULL", details->lobby.member_count);
     return m;
 }
