@@ -916,8 +916,37 @@ EOS_DECLARE_FUNC(EOS_EResult) EOS_Connect_CopyIdToken(
     EOS_Connect_IdToken** OutIdToken
 ) {
     EOS_LOG_API_ENTER();
-    EOS_LOG_WARN("CopyIdToken not supported in LAN emulator");
-    return EOS_NotFound;
+    if (!Options || !OutIdToken || !Options->LocalUserId) {
+        if (OutIdToken) *OutIdToken = NULL;
+        return EOS_InvalidParameters;
+    }
+
+    // Mint a LAN ID token. On a real deployment this is an Epic-signed JWT; on
+    // LAN both peers are this same emulator, so we use the local user's 32-char
+    // PUID hex as the token payload. The receiving peer's VerifyIdToken just
+    // reads the ProductUserId back out — enough for V Rising's connect/identity
+    // handshake without real Epic signing. Freed by EOS_Connect_IdToken_Release.
+    char hex[33];
+    int32_t hlen = (int32_t)sizeof(hex);
+    if (EOS_ProductUserId_ToString(Options->LocalUserId, hex, &hlen) != EOS_Success) {
+        *OutIdToken = NULL;
+        return EOS_InvalidParameters;
+    }
+
+    EOS_Connect_IdToken* tok = calloc(1, sizeof(*tok));
+    char* jwt = malloc(sizeof(hex));
+    if (!tok || !jwt) {
+        free(tok); free(jwt);
+        *OutIdToken = NULL;
+        return EOS_UnexpectedError;
+    }
+    memcpy(jwt, hex, sizeof(hex));
+    tok->ApiVersion = EOS_CONNECT_IDTOKEN_API_LATEST;
+    tok->ProductUserId = Options->LocalUserId;
+    tok->JsonWebToken = jwt;
+    *OutIdToken = tok;
+    EOS_LOG_INFO("CopyIdToken: issued LAN id token for %s", hex);
+    return EOS_Success;
 }
 
 EOS_DECLARE_FUNC(void) EOS_Connect_VerifyIdToken(
@@ -927,12 +956,20 @@ EOS_DECLARE_FUNC(void) EOS_Connect_VerifyIdToken(
     const EOS_Connect_OnVerifyIdTokenCallback CompletionDelegate
 ) {
     EOS_LOG_API_ENTER();
-    EOS_LOG_WARN("VerifyIdToken not supported in LAN emulator - returning success");
 
     if (CompletionDelegate) {
         EOS_Connect_VerifyIdTokenCallbackInfo info = {0};
         info.ResultCode = EOS_Success;
         info.ClientData = ClientData;
+        // Our LAN tokens carry the issuer's PUID (see EOS_Connect_CopyIdToken);
+        // echo it back so the verifying peer learns who connected. The caller
+        // populates Options->IdToken.ProductUserId via FromString(JWT).
+        if (Options && Options->IdToken) {
+            info.ProductUserId = Options->IdToken->ProductUserId;
+        }
+        info.bIsAccountInfoPresent = EOS_FALSE;
+        EOS_LOG_INFO("VerifyIdToken: accepted LAN id token (PUID %s)",
+                     info.ProductUserId ? "present" : "null");
         CompletionDelegate(&info);
     }
 }
@@ -997,6 +1034,7 @@ EOS_DECLARE_FUNC(void) EOS_Connect_ExternalAccountInfo_Release(EOS_Connect_Exter
 }
 
 EOS_DECLARE_FUNC(void) EOS_Connect_IdToken_Release(EOS_Connect_IdToken* IdToken) {
-    // No-op in LAN emulator as we never allocate these
-    (void)IdToken;
+    if (!IdToken) return;
+    if (IdToken->JsonWebToken) free((void*)IdToken->JsonWebToken);
+    free(IdToken);
 }
