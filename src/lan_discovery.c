@@ -167,9 +167,11 @@ static bool parse_announcement(const uint8_t* buf, int len, Session* session) {
     session->host_address[63] = '\0';
     offset += 64;
 
-    // Owner ID
+    // Owner ID — a ProductUserId is exactly 32 hex chars; null-terminate at [32]
+    // (NOT [31], which clobbered the last char -> 31-char id -> FromString fails
+    // -> owner/member NULL -> game reports "session is full").
     memcpy(session->owner_id_string, buf + offset, 32);
-    session->owner_id_string[31] = '\0';
+    session->owner_id_string[32] = '\0';
     offset += 32;
 
     if (offset + 10 > len) return false;
