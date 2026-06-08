@@ -1020,6 +1020,8 @@ EOS_DECLARE_FUNC(void) EOS_Lobby_UpdateLobby(
     }
     memcpy(l->attributes, mod->staged.attributes,
            sizeof(LobbyAttribute) * l->attribute_count);
+    EOS_LOG_INFO("UpdateLobby: committed %d attribute(s) to lobby %s",
+                 l->attribute_count, l->lobby_id);
 
     /* Apply staged local-member attributes to the modifying member. */
     if (mod->member_attribute_count > 0 && mod->local_user) {

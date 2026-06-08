@@ -1,6 +1,7 @@
 #include "eos/eos_lobby.h"
 #include "eos/eos_lobby_types.h"
 #include "internal/lobby_internal.h"
+#include "internal/logging.h"
 #include <stdlib.h>
 #include <string.h>
 
@@ -144,7 +145,10 @@ EOS_DECLARE_FUNC(EOS_EResult) EOS_LobbyModification_AddAttribute(
         return EOS_InvalidParameters;
     }
 
-    if (!Options || Options->ApiVersion != EOS_LOBBYMODIFICATION_ADDATTRIBUTE_API_LATEST) {
+    // Accept any ApiVersion — EOS is backward-compatible; a strict != check
+    // silently dropped every lobby attribute when Palworld's SDK version differed
+    // from ours, so attribute search (InviteCode/PRESENCESEARCH/...) never matched.
+    if (!Options) {
         return EOS_InvalidParameters;
     }
 
@@ -153,6 +157,9 @@ EOS_DECLARE_FUNC(EOS_EResult) EOS_LobbyModification_AddAttribute(
     }
 
     const EOS_Lobby_AttributeData* attr_data = Options->Attribute;
+    EOS_LOG_INFO("LobbyModification_AddAttribute: key='%s' type=%d apiver=%d (expected %d)",
+                 attr_data->Key, (int)attr_data->ValueType, (int)Options->ApiVersion,
+                 (int)EOS_LOBBYMODIFICATION_ADDATTRIBUTE_API_LATEST);
 
     // Check if attribute already exists and update it
     int existing_index = -1;
