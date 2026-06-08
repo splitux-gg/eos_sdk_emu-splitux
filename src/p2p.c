@@ -4,7 +4,10 @@
 #include "eos/eos_p2p_types.h"
 #include "internal/p2p_internal.h"
 #include "internal/platform_internal.h"
+#include "internal/connect_internal.h"
+#include "internal/callbacks.h"
 #include "internal/logging.h"
+#include "lan_p2p.h"
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
@@ -15,6 +18,16 @@
 // Default queue sizes (in bytes)
 #define DEFAULT_INCOMING_QUEUE_MAX (1024 * 1024)  // 1MB
 #define DEFAULT_OUTGOING_QUEUE_MAX (1024 * 1024)  // 1MB
+
+// LAN P2P wire message types (raw byte carried in the packet header).
+// These intentionally match lan_p2p.h's P2P_MSG_* values.
+#define MSG_DATA    1
+#define MSG_CONNECT 2
+#define MSG_ACCEPT  3
+#define MSG_CLOSE   4
+
+// Re-send an unanswered CONNECT at most this often (ms).
+#define P2P_CONNECT_RESEND_MS 250
 
 // Helper: Get current time in milliseconds
 static uint64_t get_time_ms(void) {
@@ -27,15 +40,32 @@ static uint64_t get_time_ms(void) {
 #endif
 }
 
-// Helper: Copy ProductUserId to string
+// Helper: Copy ProductUserId to string.
+// Emit the REAL 32-char hex (the same value that travels on the wire), not the
+// "%p" pointer form: the lobby/sessions layer hands us one ProductUserId object
+// for the host while Palworld hands SendPacket a *different* object for the same
+// logical user, so any key/compare must be value-based to line them up.
 static void product_user_id_to_string(EOS_ProductUserId user_id, char* out, size_t out_size) {
     if (!user_id || !out || out_size < 33) return;
-    snprintf(out, out_size, "%p", (void*)user_id);
+    int32_t len = (int32_t)out_size;
+    if (EOS_ProductUserId_ToString(user_id, out, &len) != EOS_Success) {
+        // Fall back to the pointer form only if the id won't stringify.
+        snprintf(out, out_size, "%p", (void*)user_id);
+    }
 }
 
-// Helper: Compare ProductUserIds
+// Helper: Compare ProductUserIds by value (hex), not pointer identity.
+// EOS_ProductUserId_FromString / the lobby parse can mint distinct objects for
+// the same PUID, so pointer equality misses real matches (e.g. the host address
+// registered under the lobby owner id vs the RemoteUserId Palworld sends to).
 static bool product_user_id_equal(EOS_ProductUserId a, EOS_ProductUserId b) {
-    return a == b;
+    if (a == b) return true;
+    if (!a || !b) return false;
+    char ha[33], hb[33];
+    int32_t la = (int32_t)sizeof(ha), lb = (int32_t)sizeof(hb);
+    if (EOS_ProductUserId_ToString(a, ha, &la) != EOS_Success) return false;
+    if (EOS_ProductUserId_ToString(b, hb, &lb) != EOS_Success) return false;
+    return strcmp(ha, hb) == 0;
 }
 
 // Helper: Copy socket ID
@@ -164,6 +194,193 @@ static bool queue_pending_packet(P2PState* state, const PendingPacket* packet) {
     return true;
 }
 
+// ----------------------------------------------------------------------------
+// LAN transport helpers (wire the lan_p2p UDP socket into the P2P state)
+// ----------------------------------------------------------------------------
+
+// Resolve the local logged-in user's ProductUserId (stable pointer owned by
+// ConnectState). P2PState.local_user may not be populated, so derive it from
+// the connect subsystem at call time.
+static EOS_ProductUserId p2p_local_puid(P2PState* state) {
+    if (!state || !state->platform) return NULL;
+    if (state->local_user) return state->local_user;
+    ConnectState* cs = state->platform->connect;
+    if (!cs) return NULL;
+    // Return the MOST-RECENT logged-in user, not the first. Palworld does an
+    // anonymous Connect_Login first (slot 0) and then a Steam-authenticated one
+    // (slot 1); it runs the lobby and all P2P networking under that *second*
+    // identity. The lobby owner/member PUIDs - and therefore the RemoteUserId
+    // the peer addresses us by - are the Steam PUID. If we stamped our wire
+    // sender_id with slot 0 instead, the peer's CONNECT/ACCEPT/DATA could never
+    // be matched to the connection it is actually trying to establish (it would
+    // ESTABLISH a throwaway conn under the wrong id while the real one spun on
+    // REQUESTING forever). Iterate backwards so we hand back the Steam login.
+    for (int i = MAX_LOCAL_USERS - 1; i >= 0; i--) {
+        if (cs->users[i].in_use && cs->users[i].status == EOS_LS_LoggedIn) {
+            return (EOS_ProductUserId)&cs->users[i].user_id;
+        }
+    }
+    return NULL;
+}
+
+// The 32-char hex string for the local user (the on-the-wire sender_id).
+// Returns a pointer into ConnectState's stable storage (do NOT free).
+static const char* p2p_local_hex(P2PState* state) {
+    EOS_ProductUserId p = p2p_local_puid(state);
+    if (!p) return NULL;
+    return ((EOS_ProductUserIdDetails*)p)->id_string;
+}
+
+// Find a connection by the peer's 32-char hex id (used on the receive path,
+// where EOS_ProductUserId_FromString hands back a fresh pointer each call so
+// pointer identity cannot be relied upon).
+static PeerConnection* find_connection_by_hex(P2PState* state, const char* hex,
+                                              const EOS_P2P_SocketId* socket_id) {
+    if (!state || !hex || !socket_id) return NULL;
+    for (int i = 0; i < MAX_CONNECTIONS; i++) {
+        PeerConnection* conn = &state->connections[i];
+        if (!conn->valid) continue;
+        if (!socket_id_equal(&conn->socket_id, socket_id)) continue;
+        if (strcmp(conn->peer_id_string, hex) != 0) continue;
+        return conn;
+    }
+    return NULL;
+}
+
+// Send one wire message to a peer over the LAN UDP socket.
+static void p2p_send_msg(P2PState* state, PeerConnection* conn, uint8_t msg_type,
+                         uint8_t channel, const uint8_t* data, uint32_t data_len) {
+    if (!state || !state->sock || !conn) return;
+    if (conn->peer_address[0] == '\0') {
+        EOS_LOG_DEBUG("P2P: cannot send msg %u to %s - no peer address yet",
+                      (unsigned)msg_type, conn->peer_id_string);
+        return;
+    }
+
+    const char* local = p2p_local_hex(state);
+
+    P2PSendPacket pkt;
+    memset(&pkt, 0, sizeof(pkt));
+    pkt.target_addr = conn->peer_address;
+    pkt.sender_id = local ? local : "";
+    pkt.socket_name = conn->socket_id.SocketName;
+    pkt.channel = channel;
+    pkt.message_type = msg_type;
+    pkt.data = data;
+    pkt.data_len = data_len;
+    pkt.sequence = 0;
+    pkt.reliable = false;
+
+    lan_p2p_send(state->sock, &pkt);
+}
+
+// Fire the stored "incoming connection request" notifications for a connection.
+// Notifications are queued via the platform callback queue (info copied by
+// value, pointers reference stable storage) to match the lobby/sessions style
+// and avoid re-entrancy while we are still inside the tick.
+static void p2p_fire_conn_request(P2PState* state, PeerConnection* conn) {
+    EOS_ProductUserId local = p2p_local_puid(state);
+    for (int i = 0; i < MAX_NOTIFICATIONS; i++) {
+        P2PNotification* n = &state->conn_request_notifs[i];
+        if (!n->active || !n->callback) continue;
+        if (n->has_socket_filter && !socket_id_equal(&n->socket_filter, &conn->socket_id)) continue;
+
+        EOS_P2P_OnIncomingConnectionRequestInfo info;
+        memset(&info, 0, sizeof(info));
+        info.ClientData = n->client_data;
+        info.LocalUserId = local;
+        info.RemoteUserId = conn->peer_id;
+        info.SocketId = &conn->socket_id;
+
+        if (state->platform && state->platform->callbacks) {
+            callback_queue_push(state->platform->callbacks, n->callback, &info, sizeof(info));
+        } else {
+            ((EOS_P2P_OnIncomingConnectionRequestCallback)n->callback)(&info);
+        }
+    }
+}
+
+// Fire the stored "connection established" notifications for a connection.
+static void p2p_fire_conn_established(P2PState* state, PeerConnection* conn) {
+    EOS_ProductUserId local = p2p_local_puid(state);
+    for (int i = 0; i < MAX_NOTIFICATIONS; i++) {
+        P2PNotification* n = &state->conn_established_notifs[i];
+        if (!n->active || !n->callback) continue;
+        if (n->has_socket_filter && !socket_id_equal(&n->socket_filter, &conn->socket_id)) continue;
+
+        EOS_P2P_OnPeerConnectionEstablishedInfo info;
+        memset(&info, 0, sizeof(info));
+        info.ClientData = n->client_data;
+        info.LocalUserId = local;
+        info.RemoteUserId = conn->peer_id;
+        info.SocketId = &conn->socket_id;
+        info.ConnectionType = EOS_CET_NewConnection;
+        info.NetworkType = EOS_NCT_DirectConnection;
+
+        if (state->platform && state->platform->callbacks) {
+            callback_queue_push(state->platform->callbacks, n->callback, &info, sizeof(info));
+        } else {
+            ((EOS_P2P_OnPeerConnectionEstablishedCallback)n->callback)(&info);
+        }
+    }
+}
+
+// Fire the stored "remote connection closed" notifications for a connection.
+static void p2p_fire_conn_closed(P2PState* state, PeerConnection* conn,
+                                 EOS_EConnectionClosedReason reason) {
+    EOS_ProductUserId local = p2p_local_puid(state);
+    for (int i = 0; i < MAX_NOTIFICATIONS; i++) {
+        P2PNotification* n = &state->conn_closed_notifs[i];
+        if (!n->active || !n->callback) continue;
+        if (n->has_socket_filter && !socket_id_equal(&n->socket_filter, &conn->socket_id)) continue;
+
+        EOS_P2P_OnRemoteConnectionClosedInfo info;
+        memset(&info, 0, sizeof(info));
+        info.ClientData = n->client_data;
+        info.LocalUserId = local;
+        info.RemoteUserId = conn->peer_id;
+        info.SocketId = &conn->socket_id;
+        info.Reason = reason;
+
+        if (state->platform && state->platform->callbacks) {
+            callback_queue_push(state->platform->callbacks, n->callback, &info, sizeof(info));
+        } else {
+            ((EOS_P2P_OnRemoteConnectionClosedCallback)n->callback)(&info);
+        }
+    }
+}
+
+// Flush any queued (delayed-delivery) packets whose target connection has
+// reached ESTABLISHED. Called every tick; this is also what drains a peer's
+// backlog right after we receive its ACCEPT.
+static void p2p_flush_send_queue(P2PState* state) {
+    if (state->send_count <= 0) return;
+
+    int flushed = 0;
+    for (int i = 0; i < MAX_SEND_QUEUE; i++) {
+        PendingPacket* pkt = &state->send_queue[i];
+        if (!pkt->valid) continue;
+
+        PeerConnection* conn = find_connection(state, pkt->target, &pkt->socket_id);
+        if (!conn || conn->state != CONN_STATE_ESTABLISHED) continue;
+
+        p2p_send_msg(state, conn, MSG_DATA, pkt->channel, pkt->data, pkt->size);
+
+        pkt->valid = false;
+        if (state->send_count > 0) state->send_count--;
+        if (state->outgoing_queue_current_bytes >= pkt->size) {
+            state->outgoing_queue_current_bytes -= pkt->size;
+        } else {
+            state->outgoing_queue_current_bytes = 0;
+        }
+        flushed++;
+    }
+
+    if (flushed > 0) {
+        EOS_LOG_DEBUG("P2P: flushed %d queued DATA packet(s) on established connections", flushed);
+    }
+}
+
 // Create P2P state
 P2PState* p2p_create(PlatformState* platform) {
     if (!platform) {
@@ -189,6 +406,20 @@ P2PState* p2p_create(PlatformState* platform) {
     state->incoming_queue_max_bytes = DEFAULT_INCOMING_QUEUE_MAX;
     state->outgoing_queue_max_bytes = DEFAULT_OUTGOING_QUEUE_MAX;
 
+    // Bring up the LAN UDP transport. Base port 7777; lan_p2p falls back to the
+    // next free port (7778, ...) when 7777 is taken, so the host binds 7777 and
+    // a second local instance binds 7778. A failure here is non-fatal: the rest
+    // of the P2P API still operates (degraded) so we don't crash the game.
+    state->sock = lan_p2p_create(7777);
+    if (!state->sock) {
+        EOS_LOG_ERROR("P2P: lan_p2p_create(7777) failed - P2P transport DEGRADED (no socket)");
+    } else {
+        EOS_LOG_INFO("P2P: LAN transport bound on %s:%u",
+                     lan_p2p_get_local_ip(state->sock),
+                     (unsigned)lan_p2p_get_port(state->sock));
+    }
+    state->last_connect_send = 0;
+
     EOS_LOG_INFO("P2P: Created P2P state");
     return state;
 }
@@ -198,8 +429,23 @@ void p2p_destroy(P2PState* state) {
     if (!state || state->magic != P2P_MAGIC) return;
 
     EOS_LOG_INFO("P2P: Destroying P2P state");
+    if (state->sock) {
+        lan_p2p_destroy(state->sock);
+        state->sock = NULL;
+    }
     state->magic = 0;
     free(state);
+}
+
+// Local P2P listen port/ip (for advertising host_address in the lobby).
+uint16_t p2p_get_listen_port(P2PState* state) {
+    if (!state || state->magic != P2P_MAGIC || !state->sock) return 0;
+    return lan_p2p_get_port(state->sock);
+}
+
+const char* p2p_get_listen_ip(P2PState* state) {
+    if (!state || state->magic != P2P_MAGIC || !state->sock) return NULL;
+    return lan_p2p_get_local_ip(state->sock);
 }
 
 // Register peer address (called by sessions module)
@@ -258,10 +504,149 @@ const char* p2p_get_peer_address(P2PState* state, EOS_ProductUserId peer) {
 // Tick function (process network, timeouts, etc.)
 void p2p_tick(P2PState* state) {
     if (!state || state->magic != P2P_MAGIC) return;
+    if (!state->sock) return;  // transport degraded - nothing to drive
 
-    // TODO: Receive packets from network using lan_p2p
-    // TODO: Process pending send queue for established connections
-    // TODO: Check for connection timeouts
+    uint64_t now = get_time_ms();
+
+    // ------------------------------------------------------------------
+    // (a) RECEIVE: drain everything the socket has this tick.
+    // ------------------------------------------------------------------
+    P2PReceivedPacket rp;
+    while (lan_p2p_recv(state->sock, &rp)) {
+        // Build the socket id from the wire socket name.
+        EOS_P2P_SocketId sock_id;
+        memset(&sock_id, 0, sizeof(sock_id));
+        sock_id.ApiVersion = EOS_P2P_SOCKETID_API_LATEST;
+        strncpy(sock_id.SocketName, rp.socket_name, EOS_P2P_SOCKETID_SOCKETNAME_SIZE - 1);
+        sock_id.SocketName[EOS_P2P_SOCKETID_SOCKETNAME_SIZE - 1] = '\0';
+
+        // Find the connection by the peer's hex id (pointer identity is not
+        // stable across FromString calls). Create one on first contact.
+        PeerConnection* conn = find_connection_by_hex(state, rp.sender_id, &sock_id);
+        if (!conn) {
+            EOS_ProductUserId peer = EOS_ProductUserId_FromString(rp.sender_id);
+            if (!peer) {
+                EOS_LOG_WARN("P2P: dropping packet with invalid sender id '%s'", rp.sender_id);
+                continue;
+            }
+            conn = create_connection(state, peer, &sock_id);
+            if (!conn) {
+                EOS_LOG_ERROR("P2P: connection table full, dropping packet from %s", rp.sender_id);
+                continue;
+            }
+            // Key the connection on the wire hex id (not the "%p" pointer form).
+            strncpy(conn->peer_id_string, rp.sender_id, sizeof(conn->peer_id_string) - 1);
+            conn->peer_id_string[sizeof(conn->peer_id_string) - 1] = '\0';
+        }
+
+        // Learn / refresh the peer's source address and liveness.
+        strncpy(conn->peer_address, rp.sender_addr, sizeof(conn->peer_address) - 1);
+        conn->peer_address[sizeof(conn->peer_address) - 1] = '\0';
+        conn->last_activity = now;
+
+        switch (rp.message_type) {
+            case MSG_CONNECT: {
+                if (conn->state == CONN_STATE_ESTABLISHED) {
+                    // Retransmitted CONNECT - just re-ACK, don't re-fire.
+                    p2p_send_msg(state, conn, MSG_ACCEPT, 0, NULL, 0);
+                    break;
+                }
+                if (is_socket_auto_accepted(state, &sock_id)) {
+                    conn->state = CONN_STATE_ESTABLISHED;
+                    conn->established_at = now;
+                    p2p_send_msg(state, conn, MSG_ACCEPT, 0, NULL, 0);
+                    EOS_LOG_INFO("P2P: CONNECT from %s on '%s' auto-accepted -> sent ACCEPT, ESTABLISHED",
+                                 rp.sender_id, sock_id.SocketName);
+                    p2p_fire_conn_request(state, conn);
+                    p2p_fire_conn_established(state, conn);
+                } else {
+                    conn->state = CONN_STATE_PENDING;
+                    EOS_LOG_INFO("P2P: CONNECT from %s on '%s' pending app accept",
+                                 rp.sender_id, sock_id.SocketName);
+                    p2p_fire_conn_request(state, conn);
+                }
+                break;
+            }
+
+            case MSG_ACCEPT: {
+                if (conn->state != CONN_STATE_ESTABLISHED) {
+                    conn->state = CONN_STATE_ESTABLISHED;
+                    conn->established_at = now;
+                    EOS_LOG_INFO("P2P: ACCEPT from %s on '%s' -> ESTABLISHED",
+                                 rp.sender_id, sock_id.SocketName);
+                    p2p_fire_conn_established(state, conn);
+                    // Drain anything we queued for this peer while connecting.
+                    p2p_flush_send_queue(state);
+                }
+                break;
+            }
+
+            case MSG_DATA: {
+                // Receiving DATA implies the peer considers us connected; make
+                // sure our side is established too (auto-accept path).
+                if (conn->state != CONN_STATE_ESTABLISHED &&
+                    is_socket_auto_accepted(state, &sock_id)) {
+                    conn->state = CONN_STATE_ESTABLISHED;
+                    conn->established_at = now;
+                    p2p_send_msg(state, conn, MSG_ACCEPT, 0, NULL, 0);
+                    EOS_LOG_INFO("P2P: first DATA from %s on '%s' -> ESTABLISHED (auto-accept)",
+                                 rp.sender_id, sock_id.SocketName);
+                    p2p_fire_conn_established(state, conn);
+                }
+
+                ReceivedPacket out;
+                memset(&out, 0, sizeof(out));
+                out.valid = true;
+                out.sender = conn->peer_id;
+                strncpy(out.sender_id_string, rp.sender_id, sizeof(out.sender_id_string) - 1);
+                copy_socket_id(&out.socket_id, &sock_id);
+                out.channel = rp.channel;
+                out.size = (rp.data_len > MAX_PACKET_SIZE) ? MAX_PACKET_SIZE : rp.data_len;
+                if (rp.data && out.size > 0) {
+                    memcpy(out.data, rp.data, out.size);
+                }
+                queue_received_packet(state, &out);
+                EOS_LOG_DEBUG("P2P: recv DATA %u bytes from %s (ch %u)",
+                              out.size, rp.sender_id, (unsigned)rp.channel);
+                break;
+            }
+
+            case MSG_CLOSE: {
+                if (conn->state != CONN_STATE_CLOSED && conn->valid) {
+                    conn->state = CONN_STATE_CLOSED;
+                    EOS_LOG_INFO("P2P: CLOSE from %s on '%s'", rp.sender_id, sock_id.SocketName);
+                    p2p_fire_conn_closed(state, conn, EOS_CCR_ClosedByPeer);
+                    conn->valid = false;
+                    if (state->connection_count > 0) state->connection_count--;
+                }
+                break;
+            }
+
+            default:
+                EOS_LOG_WARN("P2P: unknown wire message type %u from %s",
+                             (unsigned)rp.message_type, rp.sender_id);
+                break;
+        }
+    }
+
+    // ------------------------------------------------------------------
+    // (b) SEND: (re)send CONNECT for connections still waiting for ACCEPT.
+    // ------------------------------------------------------------------
+    for (int i = 0; i < MAX_CONNECTIONS; i++) {
+        PeerConnection* conn = &state->connections[i];
+        if (!conn->valid) continue;
+        if (conn->state != CONN_STATE_REQUESTING) continue;
+        if (conn->peer_address[0] == '\0') continue;  // no target yet
+
+        if ((now - state->last_connect_send) >= P2P_CONNECT_RESEND_MS) {
+            p2p_send_msg(state, conn, MSG_CONNECT, 0, NULL, 0);
+            state->last_connect_send = now;
+            EOS_LOG_DEBUG("P2P: sent CONNECT to %s (%s)", conn->peer_id_string, conn->peer_address);
+        }
+    }
+
+    // (c) Flush queued DATA for any connection that is now established.
+    p2p_flush_send_queue(state);
 }
 
 //
@@ -283,9 +668,11 @@ EOS_EResult EOS_P2P_SendPacket(
         return EOS_InvalidParameters;
     }
 
+    // Be lenient about ApiVersion - Palworld is built against an older P2P API
+    // and a strict equality check would reject every send.
     if (Options->ApiVersion != EOS_P2P_SENDPACKET_API_LATEST) {
-        EOS_LOG_ERROR("P2P_SendPacket: Invalid API version");
-        return EOS_InvalidParameters;
+        EOS_LOG_DEBUG("P2P_SendPacket: ApiVersion=%d (latest=%d) - proceeding",
+                      Options->ApiVersion, EOS_P2P_SENDPACKET_API_LATEST);
     }
 
     if (!Options->LocalUserId || !Options->RemoteUserId) {
@@ -307,9 +694,11 @@ EOS_EResult EOS_P2P_SendPacket(
     PeerConnection* conn = find_connection(state, Options->RemoteUserId, Options->SocketId);
 
     if (conn && conn->state == CONN_STATE_ESTABLISHED) {
-        // Connection established - send immediately
-        // TODO: Send via lan_p2p
-        EOS_LOG_DEBUG("P2P_SendPacket: Sending %u bytes to established connection", Options->DataLengthBytes);
+        // Connection established - transmit immediately over the LAN socket.
+        p2p_send_msg(state, conn, MSG_DATA, Options->Channel,
+                     (const uint8_t*)Options->Data, Options->DataLengthBytes);
+        EOS_LOG_DEBUG("P2P_SendPacket: sent %u bytes to established connection (ch %u)",
+                      Options->DataLengthBytes, (unsigned)Options->Channel);
         return EOS_Success;
     }
 
@@ -327,16 +716,30 @@ EOS_EResult EOS_P2P_SendPacket(
             return EOS_LimitExceeded;
         }
 
-        // Try to get peer address
+        // Key the connection on the peer's real 32-char hex id (matches what
+        // arrives on the wire), not the internal "%p" dedup form.
+        {
+            char hex[33];
+            int32_t hlen = (int32_t)sizeof(hex);
+            if (EOS_ProductUserId_ToString(Options->RemoteUserId, hex, &hlen) == EOS_Success) {
+                strncpy(conn->peer_id_string, hex, sizeof(conn->peer_id_string) - 1);
+                conn->peer_id_string[sizeof(conn->peer_id_string) - 1] = '\0';
+            }
+        }
+
+        // Try to get peer address (registered from the lobby/session host_address)
         const char* addr = p2p_get_peer_address(state, Options->RemoteUserId);
         if (addr) {
             strncpy(conn->peer_address, addr, sizeof(conn->peer_address) - 1);
             conn->peer_address[sizeof(conn->peer_address) - 1] = '\0';
         }
 
-        // TODO: Send CONNECT message
+        // Move to REQUESTING; p2p_tick sends (and re-sends) the CONNECT message.
         conn->state = CONN_STATE_REQUESTING;
-        EOS_LOG_DEBUG("P2P_SendPacket: Initiating connection request");
+        state->last_connect_send = 0;  // let tick fire the first CONNECT immediately
+        EOS_LOG_INFO("P2P_SendPacket: initiating connection to %s (%s)",
+                     conn->peer_id_string,
+                     conn->peer_address[0] ? conn->peer_address : "addr pending");
     }
 
     // Queue packet if allowed
@@ -383,7 +786,8 @@ EOS_EResult EOS_P2P_GetNextReceivedPacketSize(
     }
 
     if (Options->ApiVersion != EOS_P2P_GETNEXTRECEIVEDPACKETSIZE_API_LATEST) {
-        return EOS_InvalidParameters;
+        EOS_LOG_DEBUG("P2P_GetNextReceivedPacketSize: ApiVersion=%d - proceeding",
+                      Options->ApiVersion);
     }
 
     if (!Options->LocalUserId) {
@@ -431,7 +835,7 @@ EOS_EResult EOS_P2P_ReceivePacket(
     }
 
     if (Options->ApiVersion != EOS_P2P_RECEIVEPACKET_API_LATEST) {
-        return EOS_InvalidParameters;
+        EOS_LOG_DEBUG("P2P_ReceivePacket: ApiVersion=%d - proceeding", Options->ApiVersion);
     }
 
     if (!Options->LocalUserId) {
@@ -729,7 +1133,8 @@ EOS_EResult EOS_P2P_AcceptConnection(
     }
 
     if (Options->ApiVersion != EOS_P2P_ACCEPTCONNECTION_API_LATEST) {
-        return EOS_InvalidParameters;
+        EOS_LOG_DEBUG("P2P_AcceptConnection: ApiVersion=%d (latest=%d) - proceeding",
+                      Options->ApiVersion, EOS_P2P_ACCEPTCONNECTION_API_LATEST);
     }
 
     if (!Options->LocalUserId || !Options->RemoteUserId || !Options->SocketId) {
@@ -761,14 +1166,25 @@ EOS_EResult EOS_P2P_AcceptConnection(
         }
     }
 
-    // Find or create connection
+    // Find connection. The pending connection was created on the receive path
+    // keyed on the peer hex id, so match by hex (pointer identity is unstable).
     PeerConnection* conn = find_connection(state, Options->RemoteUserId, Options->SocketId);
+    if (!conn) {
+        char hex[33];
+        int32_t hlen = (int32_t)sizeof(hex);
+        if (EOS_ProductUserId_ToString(Options->RemoteUserId, hex, &hlen) == EOS_Success) {
+            conn = find_connection_by_hex(state, hex, Options->SocketId);
+        }
+    }
     if (conn) {
-        if (conn->state == CONN_STATE_PENDING) {
-            // TODO: Send ACCEPT message
+        if (conn->state == CONN_STATE_PENDING || conn->state == CONN_STATE_REQUESTING) {
             conn->state = CONN_STATE_ESTABLISHED;
             conn->established_at = get_time_ms();
-            EOS_LOG_DEBUG("P2P: Connection accepted and established");
+            p2p_send_msg(state, conn, MSG_ACCEPT, 0, NULL, 0);
+            EOS_LOG_INFO("P2P: AcceptConnection -> sent ACCEPT, ESTABLISHED with %s",
+                         conn->peer_id_string);
+            p2p_fire_conn_established(state, conn);
+            p2p_flush_send_queue(state);
         }
     }
 

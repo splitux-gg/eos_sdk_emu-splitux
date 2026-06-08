@@ -149,59 +149,10 @@ EOS_DECLARE_FUNC(EOS_EResult) EOS_Leaderboards_CopyLeaderboardUserScoreByUserId(
 EOS_DECLARE_FUNC(void) EOS_Leaderboards_LeaderboardUserScore_Release(EOS_Leaderboards_LeaderboardUserScore* Score) { EOS_LOG_WARN("STUB called: %s", __func__); UNUSED(Score); }
 
 // ============ Lobby ============
-EOS_DECLARE_FUNC(void) EOS_Lobby_CreateLobby(EOS_HLobby Handle, const void* Options, void* ClientData, void* Callback) { EOS_LOG_WARN("STUB called: %s", __func__); UNUSED(Handle); UNUSED(Options); UNUSED(ClientData); UNUSED(Callback); }
-EOS_DECLARE_FUNC(void) EOS_Lobby_JoinLobby(EOS_HLobby Handle, const void* Options, void* ClientData, void* Callback) { EOS_LOG_WARN("STUB called: %s", __func__); UNUSED(Handle); UNUSED(Options); UNUSED(ClientData); UNUSED(Callback); }
-EOS_DECLARE_FUNC(void) EOS_Lobby_LeaveLobby(EOS_HLobby Handle, const void* Options, void* ClientData, void* Callback) { EOS_LOG_WARN("STUB called: %s", __func__); UNUSED(Handle); UNUSED(Options); UNUSED(ClientData); UNUSED(Callback); }
-EOS_DECLARE_FUNC(void) EOS_Lobby_UpdateLobby(EOS_HLobby Handle, const void* Options, void* ClientData, void* Callback) { EOS_LOG_WARN("STUB called: %s", __func__); UNUSED(Handle); UNUSED(Options); UNUSED(ClientData); UNUSED(Callback); }
+// NOTE: the real Lobby interface now lives in lobby.c / lobby_modification.c /
+// lobby_search.c / lobby_details.c. Only EOS_Lobby_SendInvite remains a stub
+// (no LAN invite system; Palworld co-op uses search + join, not invites).
 EOS_DECLARE_FUNC(void) EOS_Lobby_SendInvite(EOS_HLobby Handle, const void* Options, void* ClientData, void* Callback) { EOS_LOG_WARN("STUB called: %s", __func__); UNUSED(Handle); UNUSED(Options); UNUSED(ClientData); UNUSED(Callback); }
-EOS_DECLARE_FUNC(void) EOS_Lobby_KickMember(EOS_HLobby Handle, const void* Options, void* ClientData, void* Callback) { EOS_LOG_WARN("STUB called: %s", __func__); UNUSED(Handle); UNUSED(Options); UNUSED(ClientData); UNUSED(Callback); }
-EOS_DECLARE_FUNC(EOS_EResult) EOS_Lobby_UpdateLobbyModification(EOS_HLobby Handle, const void* Options, void** Out) { EOS_LOG_WARN("STUB called: %s", __func__); UNUSED(Handle); UNUSED(Options); if(Out) *Out = NULL; return EOS_NotFound; }
-EOS_DECLARE_FUNC(EOS_EResult) EOS_Lobby_CopyLobbyDetailsHandle(EOS_HLobby Handle, const void* Options, void** Out) { EOS_LOG_WARN("STUB called: %s", __func__); UNUSED(Handle); UNUSED(Options); if(Out) *Out = NULL; return EOS_NotFound; }
-EOS_DECLARE_FUNC(EOS_EResult) EOS_Lobby_CopyLobbyDetailsHandleByInviteId(EOS_HLobby Handle, const void* Options, void** Out) { EOS_LOG_WARN("STUB called: %s", __func__); UNUSED(Handle); UNUSED(Options); if(Out) *Out = NULL; return EOS_NotFound; }
-EOS_DECLARE_FUNC(EOS_EResult) EOS_Lobby_CopyLobbyDetailsHandleByUiEventId(EOS_HLobby Handle, const void* Options, void** Out) { EOS_LOG_WARN("STUB called: %s", __func__); UNUSED(Handle); UNUSED(Options); if(Out) *Out = NULL; return EOS_NotFound; }
-EOS_DECLARE_FUNC(EOS_EResult) EOS_Lobby_CreateLobbySearch(EOS_HLobby Handle, const void* Options, void** Out) { EOS_LOG_WARN("STUB called: %s", __func__); UNUSED(Handle); UNUSED(Options); if(Out) *Out = NULL; return EOS_NotFound; }
-EOS_DECLARE_FUNC(EOS_EResult) EOS_Lobby_GetRTCRoomName(EOS_HLobby Handle, const void* Options, char* Out, uint32_t* Len) { EOS_LOG_WARN("STUB called: %s", __func__); UNUSED(Handle); UNUSED(Options); UNUSED(Out); UNUSED(Len); return EOS_NotFound; }
-EOS_DECLARE_FUNC(EOS_EResult) EOS_Lobby_IsRTCRoomConnected(EOS_HLobby Handle, const void* Options, EOS_Bool* Out) { EOS_LOG_WARN("STUB called: %s", __func__); UNUSED(Handle); UNUSED(Options); if(Out) *Out = EOS_FALSE; return EOS_Success; }
-EOS_DECLARE_FUNC(EOS_NotificationId) EOS_Lobby_AddNotifyLobbyUpdateReceived(EOS_HLobby Handle, const void* Options, void* ClientData, void* Callback) { EOS_LOG_WARN("STUB called: %s", __func__); UNUSED(Handle); UNUSED(Options); UNUSED(ClientData); UNUSED(Callback); return EOS_INVALID_NOTIFICATIONID; }
-EOS_DECLARE_FUNC(EOS_NotificationId) EOS_Lobby_AddNotifyLobbyMemberUpdateReceived(EOS_HLobby Handle, const void* Options, void* ClientData, void* Callback) { EOS_LOG_WARN("STUB called: %s", __func__); UNUSED(Handle); UNUSED(Options); UNUSED(ClientData); UNUSED(Callback); return EOS_INVALID_NOTIFICATIONID; }
-EOS_DECLARE_FUNC(EOS_NotificationId) EOS_Lobby_AddNotifyLobbyMemberStatusReceived(EOS_HLobby Handle, const void* Options, void* ClientData, void* Callback) { EOS_LOG_WARN("STUB called: %s", __func__); UNUSED(Handle); UNUSED(Options); UNUSED(ClientData); UNUSED(Callback); return EOS_INVALID_NOTIFICATIONID; }
-EOS_DECLARE_FUNC(EOS_NotificationId) EOS_Lobby_AddNotifyJoinLobbyAccepted(EOS_HLobby Handle, const void* Options, void* ClientData, void* Callback) { EOS_LOG_WARN("STUB called: %s", __func__); UNUSED(Handle); UNUSED(Options); UNUSED(ClientData); UNUSED(Callback); return EOS_INVALID_NOTIFICATIONID; }
-EOS_DECLARE_FUNC(EOS_NotificationId) EOS_Lobby_AddNotifyLobbyInviteAccepted(EOS_HLobby Handle, const void* Options, void* ClientData, void* Callback) { EOS_LOG_WARN("STUB called: %s", __func__); UNUSED(Handle); UNUSED(Options); UNUSED(ClientData); UNUSED(Callback); return EOS_INVALID_NOTIFICATIONID; }
-EOS_DECLARE_FUNC(EOS_NotificationId) EOS_Lobby_AddNotifyRTCRoomConnectionChanged(EOS_HLobby Handle, const void* Options, void* ClientData, void* Callback) { EOS_LOG_WARN("STUB called: %s", __func__); UNUSED(Handle); UNUSED(Options); UNUSED(ClientData); UNUSED(Callback); return EOS_INVALID_NOTIFICATIONID; }
-EOS_DECLARE_FUNC(void) EOS_Lobby_RemoveNotifyLobbyUpdateReceived(EOS_HLobby Handle, EOS_NotificationId Id) { EOS_LOG_WARN("STUB called: %s", __func__); UNUSED(Handle); UNUSED(Id); }
-EOS_DECLARE_FUNC(void) EOS_Lobby_RemoveNotifyLobbyMemberUpdateReceived(EOS_HLobby Handle, EOS_NotificationId Id) { EOS_LOG_WARN("STUB called: %s", __func__); UNUSED(Handle); UNUSED(Id); }
-EOS_DECLARE_FUNC(void) EOS_Lobby_RemoveNotifyLobbyMemberStatusReceived(EOS_HLobby Handle, EOS_NotificationId Id) { EOS_LOG_WARN("STUB called: %s", __func__); UNUSED(Handle); UNUSED(Id); }
-EOS_DECLARE_FUNC(void) EOS_Lobby_RemoveNotifyJoinLobbyAccepted(EOS_HLobby Handle, EOS_NotificationId Id) { EOS_LOG_WARN("STUB called: %s", __func__); UNUSED(Handle); UNUSED(Id); }
-EOS_DECLARE_FUNC(void) EOS_Lobby_RemoveNotifyLobbyInviteAccepted(EOS_HLobby Handle, EOS_NotificationId Id) { EOS_LOG_WARN("STUB called: %s", __func__); UNUSED(Handle); UNUSED(Id); }
-EOS_DECLARE_FUNC(void) EOS_Lobby_RemoveNotifyRTCRoomConnectionChanged(EOS_HLobby Handle, EOS_NotificationId Id) { EOS_LOG_WARN("STUB called: %s", __func__); UNUSED(Handle); UNUSED(Id); }
-EOS_DECLARE_FUNC(void) EOS_Lobby_Attribute_Release(EOS_Lobby_Attribute* Attr) { EOS_LOG_WARN("STUB called: %s", __func__); UNUSED(Attr); }
-
-// ============ LobbyModification ============
-EOS_DECLARE_FUNC(EOS_EResult) EOS_LobbyModification_SetPermissionLevel(EOS_HLobbyModification Handle, const void* Options) { EOS_LOG_WARN("STUB called: %s", __func__); UNUSED(Handle); UNUSED(Options); return EOS_Success; }
-EOS_DECLARE_FUNC(EOS_EResult) EOS_LobbyModification_SetMaxMembers(EOS_HLobbyModification Handle, const void* Options) { EOS_LOG_WARN("STUB called: %s", __func__); UNUSED(Handle); UNUSED(Options); return EOS_Success; }
-EOS_DECLARE_FUNC(EOS_EResult) EOS_LobbyModification_AddAttribute(EOS_HLobbyModification Handle, const void* Options) { EOS_LOG_WARN("STUB called: %s", __func__); UNUSED(Handle); UNUSED(Options); return EOS_Success; }
-EOS_DECLARE_FUNC(EOS_EResult) EOS_LobbyModification_AddMemberAttribute(EOS_HLobbyModification Handle, const void* Options) { EOS_LOG_WARN("STUB called: %s", __func__); UNUSED(Handle); UNUSED(Options); return EOS_Success; }
-EOS_DECLARE_FUNC(void) EOS_LobbyModification_Release(EOS_HLobbyModification Handle) { EOS_LOG_WARN("STUB called: %s", __func__); UNUSED(Handle); }
-
-// ============ LobbyDetails ============
-EOS_DECLARE_FUNC(EOS_EResult) EOS_LobbyDetails_CopyInfo(EOS_HLobbyDetails Handle, const void* Options, void** Out) { EOS_LOG_WARN("STUB called: %s", __func__); UNUSED(Handle); UNUSED(Options); if(Out) *Out = NULL; return EOS_NotFound; }
-EOS_DECLARE_FUNC(uint32_t) EOS_LobbyDetails_GetAttributeCount(EOS_HLobbyDetails Handle, const void* Options) { EOS_LOG_WARN("STUB called: %s", __func__); UNUSED(Handle); UNUSED(Options); return 0; }
-EOS_DECLARE_FUNC(EOS_EResult) EOS_LobbyDetails_CopyAttributeByIndex(EOS_HLobbyDetails Handle, const void* Options, void** Out) { EOS_LOG_WARN("STUB called: %s", __func__); UNUSED(Handle); UNUSED(Options); if(Out) *Out = NULL; return EOS_NotFound; }
-EOS_DECLARE_FUNC(uint32_t) EOS_LobbyDetails_GetMemberCount(EOS_HLobbyDetails Handle, const void* Options) { EOS_LOG_WARN("STUB called: %s", __func__); UNUSED(Handle); UNUSED(Options); return 0; }
-EOS_DECLARE_FUNC(EOS_ProductUserId) EOS_LobbyDetails_GetMemberByIndex(EOS_HLobbyDetails Handle, const void* Options) { EOS_LOG_WARN("STUB called: %s", __func__); UNUSED(Handle); UNUSED(Options); return NULL; }
-EOS_DECLARE_FUNC(uint32_t) EOS_LobbyDetails_GetMemberAttributeCount(EOS_HLobbyDetails Handle, const void* Options) { EOS_LOG_WARN("STUB called: %s", __func__); UNUSED(Handle); UNUSED(Options); return 0; }
-EOS_DECLARE_FUNC(EOS_EResult) EOS_LobbyDetails_CopyMemberAttributeByIndex(EOS_HLobbyDetails Handle, const void* Options, void** Out) { EOS_LOG_WARN("STUB called: %s", __func__); UNUSED(Handle); UNUSED(Options); if(Out) *Out = NULL; return EOS_NotFound; }
-EOS_DECLARE_FUNC(void) EOS_LobbyDetails_Release(EOS_HLobbyDetails Handle) { EOS_LOG_WARN("STUB called: %s", __func__); UNUSED(Handle); }
-EOS_DECLARE_FUNC(void) EOS_LobbyDetails_Info_Release(EOS_LobbyDetails_Info* Info) { EOS_LOG_WARN("STUB called: %s", __func__); UNUSED(Info); }
-
-// ============ LobbySearch ============
-EOS_DECLARE_FUNC(EOS_EResult) EOS_LobbySearch_SetLobbyId(EOS_HLobbySearch Handle, const void* Options) { EOS_LOG_WARN("STUB called: %s", __func__); UNUSED(Handle); UNUSED(Options); return EOS_Success; }
-EOS_DECLARE_FUNC(EOS_EResult) EOS_LobbySearch_SetTargetUserId(EOS_HLobbySearch Handle, const void* Options) { EOS_LOG_WARN("STUB called: %s", __func__); UNUSED(Handle); UNUSED(Options); return EOS_Success; }
-EOS_DECLARE_FUNC(EOS_EResult) EOS_LobbySearch_SetParameter(EOS_HLobbySearch Handle, const void* Options) { EOS_LOG_WARN("STUB called: %s", __func__); UNUSED(Handle); UNUSED(Options); return EOS_Success; }
-EOS_DECLARE_FUNC(void) EOS_LobbySearch_Find(EOS_HLobbySearch Handle, const void* Options, void* ClientData, void* Callback) { EOS_LOG_WARN("STUB called: %s", __func__); UNUSED(Handle); UNUSED(Options); UNUSED(ClientData); UNUSED(Callback); }
-EOS_DECLARE_FUNC(uint32_t) EOS_LobbySearch_GetSearchResultCount(EOS_HLobbySearch Handle, const void* Options) { EOS_LOG_WARN("STUB called: %s", __func__); UNUSED(Handle); UNUSED(Options); return 0; }
-EOS_DECLARE_FUNC(EOS_EResult) EOS_LobbySearch_CopySearchResultByIndex(EOS_HLobbySearch Handle, const void* Options, void** Out) { EOS_LOG_WARN("STUB called: %s", __func__); UNUSED(Handle); UNUSED(Options); if(Out) *Out = NULL; return EOS_NotFound; }
-EOS_DECLARE_FUNC(void) EOS_LobbySearch_Release(EOS_HLobbySearch Handle) { EOS_LOG_WARN("STUB called: %s", __func__); UNUSED(Handle); }
 
 // ============ Metrics ============
 EOS_DECLARE_FUNC(EOS_EResult) EOS_Metrics_BeginPlayerSession(EOS_HMetrics Handle, const void* Options) { EOS_LOG_WARN("STUB called: %s", __func__); UNUSED(Handle); UNUSED(Options); return EOS_Success; }

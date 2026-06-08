@@ -6,6 +6,9 @@
 #include <stdbool.h>
 #include <stdint.h>
 
+// Forward decl of the LAN UDP socket manager (defined in lan_p2p.c)
+typedef struct P2PSocketManager P2PSocketManager;
+
 #define MAX_PACKET_SIZE 4096
 #define MAX_RECV_QUEUE 512
 #define MAX_SEND_QUEUE 512
@@ -81,6 +84,10 @@ typedef struct P2PState {
     uint32_t magic;  // 0x50325032 = "P2P2"
     PlatformState* platform;
 
+    // LAN UDP transport (created in p2p_create)
+    P2PSocketManager* sock;
+    uint64_t last_connect_send;  // throttle CONNECT re-sends
+
     // Local user
     EOS_ProductUserId local_user;
 
@@ -140,5 +147,9 @@ void p2p_tick(P2PState* state);
 // Address book
 void p2p_register_peer_address(P2PState* state, EOS_ProductUserId peer, const char* address);
 const char* p2p_get_peer_address(P2PState* state, EOS_ProductUserId peer);
+
+// Local P2P listen port/ip (for advertising host_address in the lobby)
+uint16_t p2p_get_listen_port(P2PState* state);
+const char* p2p_get_listen_ip(P2PState* state);
 
 #endif // EOS_LAN_P2P_INTERNAL_H

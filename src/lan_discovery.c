@@ -28,7 +28,10 @@ typedef int socklen_t;
 #define MSG_QUERY 0x02
 
 #define MAX_CACHED_SESSIONS 64
-#define MAX_PACKET_SIZE 4096
+/* Lobbies carry many attributes (Palworld sets ~24, each string value
+ * serialized as a fixed 256 bytes -> ~8 KB). 4096 truncated the announce so
+ * the client parsed 0 attributes. Loopback/LAN UDP handles larger datagrams. */
+#define MAX_PACKET_SIZE 65536
 
 typedef struct {
     Session session;
@@ -164,9 +167,11 @@ static bool parse_announcement(const uint8_t* buf, int len, Session* session) {
     session->host_address[63] = '\0';
     offset += 64;
 
-    // Owner ID
+    // Owner ID — a ProductUserId is exactly 32 hex chars; null-terminate at [32]
+    // (NOT [31], which clobbered the last char -> 31-char id -> FromString fails
+    // -> owner/member NULL -> game reports "session is full").
     memcpy(session->owner_id_string, buf + offset, 32);
-    session->owner_id_string[31] = '\0';
+    session->owner_id_string[32] = '\0';
     offset += 32;
 
     if (offset + 10 > len) return false;
@@ -347,11 +352,15 @@ void discovery_broadcast_session(DiscoveryService* ds, const Session* session) {
     if (session->permission_level == EOS_OSPF_PublicAdvertised) flags |= 0x02;
     buf[offset++] = flags;
 
-    // Attributes
-    *(uint16_t*)(buf + offset) = htons(session->attribute_count); offset += 2;
+    // Attributes — write the count we actually serialize, and never overflow buf.
+    uint8_t* attr_count_field = buf + offset; offset += 2;
+    int attrs_written = 0;
     for (int i = 0; i < session->attribute_count && i < 64; i++) {
+        if (offset + 400 > MAX_PACKET_SIZE) break;  // 322 max per attr; stay safe
         offset += serialize_attribute(buf + offset, &session->attributes[i]);
+        attrs_written++;
     }
+    *(uint16_t*)attr_count_field = htons((uint16_t)attrs_written);
 
     // Send broadcast
     struct sockaddr_in dest = {0};

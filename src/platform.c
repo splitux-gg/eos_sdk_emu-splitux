@@ -4,6 +4,7 @@
 #include "internal/platform_internal.h"
 #include "internal/connect_internal.h"
 #include "internal/sessions_internal.h"
+#include "internal/lobby_internal.h"
 #include "internal/p2p_internal.h"
 #include "internal/callbacks.h"
 #include "internal/logging.h"
@@ -171,6 +172,16 @@ EOS_DECLARE_FUNC(EOS_HPlatform) EOS_Platform_Create(const EOS_Platform_Options* 
         return NULL;
     }
 
+    platform->lobby = lobby_create(platform);
+    if (!platform->lobby) {
+        EOS_LOG_ERROR("Failed to create Lobby subsystem");
+        p2p_destroy(platform->p2p);
+        sessions_destroy(platform->sessions);
+        connect_destroy(platform->connect);
+        free(platform);
+        return NULL;
+    }
+
     // Store in global array
     for (int i = 0; i < 8; i++) {
         if (!g_platforms[i]) {
@@ -196,6 +207,11 @@ EOS_DECLARE_FUNC(void) EOS_Platform_Release(EOS_HPlatform Handle) {
     if (platform->p2p) {
         p2p_destroy(platform->p2p);
         platform->p2p = NULL;
+    }
+
+    if (platform->lobby) {
+        lobby_destroy(platform->lobby);
+        platform->lobby = NULL;
     }
 
     if (platform->sessions) {
@@ -236,6 +252,15 @@ EOS_DECLARE_FUNC(void) EOS_Platform_Tick(EOS_HPlatform Handle) {
     // Drive LAN discovery (broadcasts sessions, polls for announcements)
     if (platform->sessions) {
         sessions_tick(platform->sessions);
+    }
+
+    if (platform->lobby) {
+        lobby_tick(platform->lobby);
+    }
+
+    // Drive the P2P transport (recv handshake/data, re-send CONNECTs, flush queue)
+    if (platform->p2p) {
+        p2p_tick(platform->p2p);
     }
 
     // Process queued callbacks
