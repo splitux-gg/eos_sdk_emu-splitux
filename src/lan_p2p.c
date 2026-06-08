@@ -69,9 +69,23 @@ P2PSocketManager* lan_p2p_create(uint16_t base_port) {
         return NULL;
     }
 
-    // Enable address reuse
+    // Bind exclusivity. On Windows, SO_REUSEADDR lets TWO sockets share the
+    // SAME addr:port (it behaves like Linux SO_REUSEPORT, not Linux
+    // SO_REUSEADDR). That breaks our base_port-with-fallback scheme: a second
+    // local instance would also "succeed" binding 7777, both end up on 7777,
+    // and the kernel then delivers a datagram sent to :7777 to an arbitrary
+    // one of the two sockets - so the handshake never reaches the right peer.
+    // SO_EXCLUSIVEADDRUSE forces a second bind to a busy port to FAIL, so the
+    // loop below falls through to 7778 and host/client get distinct ports.
+    // On POSIX, SO_REUSEADDR does NOT permit two active binds to the same port
+    // (only TIME_WAIT reuse), so the fallback already works there.
+#ifdef _WIN32
+    int exclusive = 1;
+    setsockopt(mgr->socket_fd, SOL_SOCKET, SO_EXCLUSIVEADDRUSE, (const char*)&exclusive, sizeof(exclusive));
+#else
     int reuse = 1;
     setsockopt(mgr->socket_fd, SOL_SOCKET, SO_REUSEADDR, (const char*)&reuse, sizeof(reuse));
+#endif
 
     // Try to bind to port (try several if busy)
     struct sockaddr_in addr = {0};

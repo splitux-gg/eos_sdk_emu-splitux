@@ -40,15 +40,32 @@ static uint64_t get_time_ms(void) {
 #endif
 }
 
-// Helper: Copy ProductUserId to string
+// Helper: Copy ProductUserId to string.
+// Emit the REAL 32-char hex (the same value that travels on the wire), not the
+// "%p" pointer form: the lobby/sessions layer hands us one ProductUserId object
+// for the host while Palworld hands SendPacket a *different* object for the same
+// logical user, so any key/compare must be value-based to line them up.
 static void product_user_id_to_string(EOS_ProductUserId user_id, char* out, size_t out_size) {
     if (!user_id || !out || out_size < 33) return;
-    snprintf(out, out_size, "%p", (void*)user_id);
+    int32_t len = (int32_t)out_size;
+    if (EOS_ProductUserId_ToString(user_id, out, &len) != EOS_Success) {
+        // Fall back to the pointer form only if the id won't stringify.
+        snprintf(out, out_size, "%p", (void*)user_id);
+    }
 }
 
-// Helper: Compare ProductUserIds
+// Helper: Compare ProductUserIds by value (hex), not pointer identity.
+// EOS_ProductUserId_FromString / the lobby parse can mint distinct objects for
+// the same PUID, so pointer equality misses real matches (e.g. the host address
+// registered under the lobby owner id vs the RemoteUserId Palworld sends to).
 static bool product_user_id_equal(EOS_ProductUserId a, EOS_ProductUserId b) {
-    return a == b;
+    if (a == b) return true;
+    if (!a || !b) return false;
+    char ha[33], hb[33];
+    int32_t la = (int32_t)sizeof(ha), lb = (int32_t)sizeof(hb);
+    if (EOS_ProductUserId_ToString(a, ha, &la) != EOS_Success) return false;
+    if (EOS_ProductUserId_ToString(b, hb, &lb) != EOS_Success) return false;
+    return strcmp(ha, hb) == 0;
 }
 
 // Helper: Copy socket ID
