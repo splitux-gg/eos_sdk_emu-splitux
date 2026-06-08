@@ -29,6 +29,7 @@ set(SOURCES
     src/lobby_details.c
     src/p2p.c
     src/integrated_platform.c
+    src/stubs_generated.c
 )
 
 # Include directories
