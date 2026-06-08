@@ -1,6 +1,7 @@
 #include "eos/eos_lobby.h"
 #include "eos/eos_lobby_types.h"
 #include "internal/lobby_internal.h"
+#include "internal/logging.h"
 #include <stdlib.h>
 #include <string.h>
 
@@ -275,7 +276,10 @@ EOS_DECLARE_FUNC(EOS_ProductUserId) EOS_LobbyDetails_GetMemberByIndex(
         return NULL;
     }
 
-    return details->lobby.members[Options->MemberIndex].member_id;
+    EOS_ProductUserId m = details->lobby.members[Options->MemberIndex].member_id;
+    EOS_LOG_INFO("LobbyDetails_GetMemberByIndex(%u) -> %s (member_count=%d)",
+                 Options->MemberIndex, m ? "valid" : "NULL", details->lobby.member_count);
+    return m;
 }
 
 EOS_DECLARE_FUNC(uint32_t) EOS_LobbyDetails_GetMemberAttributeCount(

@@ -484,6 +484,22 @@ void lobby_destroy(LobbyState* state) {
     free(state);
 }
 
+/* Wire-discovered lobbies carry the member COUNT but not the member entries
+ * (only the owner id string is serialized). Seed members[0] with the
+ * already-parsed owner so EOS_LobbyDetails_GetMemberByIndex(0) returns the
+ * host's ProductUserId instead of NULL — Palworld needs it to identify/join
+ * the host; without it the lobby looks invalid and it reports "session is full". */
+static void lobby_seed_owner_member(Lobby* l) {
+    if (!l || l->member_count < 1) {
+        return;
+    }
+    l->members[0].member_id = l->owner_id;  /* shared pointer (parsed once) */
+    strncpy(l->members[0].member_id_string, l->owner_id_string,
+            sizeof(l->members[0].member_id_string) - 1);
+    l->members[0].member_id_string[sizeof(l->members[0].member_id_string) - 1] = '\0';
+    l->members[0].valid = true;
+}
+
 void lobby_tick(LobbyState* state) {
     bool should_broadcast_now;
     uint64_t now;
@@ -549,12 +565,14 @@ void lobby_tick(LobbyState* state) {
             } else if (slot->owner_id_string[0] != '\0') {
                 slot->owner_id = EOS_ProductUserId_FromString(slot->owner_id_string);
             }
+            lobby_seed_owner_member(slot);
         } else if (state->discovered_lobby_count < MAX_DISCOVERED_LOBBIES) {
             Lobby* ns = &state->discovered_lobbies[state->discovered_lobby_count++];
             *ns = cand;
             if (ns->owner_id_string[0] != '\0') {
                 ns->owner_id = EOS_ProductUserId_FromString(ns->owner_id_string);
             }
+            lobby_seed_owner_member(ns);
         }
     }
 
