@@ -308,6 +308,17 @@ EOS_DECLARE_FUNC(void) EOS_LobbySearch_Find(
         }
     }
 
+    // DIAGNOSTIC: dump the search criteria so we can see exactly what the game asked for
+    EOS_LOG_INFO("LobbySearch_Find: criteria max_results=%d target_lobby_id='%s' target_user_id=%s param_count=%d ; discovered_lobby_count=%d",
+                 (int)search->max_results, search->target_lobby_id,
+                 search->target_user_id ? "(set)" : "(null)",
+                 search->param_count, state->discovered_lobby_count);
+    for (int p = 0; p < search->param_count; p++) {
+        EOS_LOG_INFO("LobbySearch_Find:   param[%d] key='%s' type=%d comparison=%d",
+                     p, search->params[p].key, (int)search->params[p].type,
+                     (int)search->params[p].comparison);
+    }
+
     // Filter discovered lobbies
     for (int i = 0; i < state->discovered_lobby_count && search->result_count < (int)search->max_results; i++) {
         Lobby* l = &state->discovered_lobbies[i];
@@ -316,9 +327,13 @@ EOS_DECLARE_FUNC(void) EOS_LobbySearch_Find(
             continue;
         }
 
+        EOS_LOG_INFO("LobbySearch_Find:   candidate[%d] id='%s' owner='%s' member_count=%d attribute_count=%d",
+                     i, l->lobby_id, l->owner_id_string, l->member_count, l->attribute_count);
+
         // Check lobby ID filter
         if (search->target_lobby_id[0] != '\0') {
             if (strcmp(l->lobby_id, search->target_lobby_id) != 0) {
+                EOS_LOG_INFO("LobbySearch_Find:     REJECT lobby_id mismatch (want '%s')", search->target_lobby_id);
                 continue;
             }
         }
@@ -333,6 +348,7 @@ EOS_DECLARE_FUNC(void) EOS_LobbySearch_Find(
                 }
             }
             if (!user_found) {
+                EOS_LOG_INFO("LobbySearch_Find:     REJECT target_user_id not found among %d members (members[] empty on wire-discovered lobbies)", l->member_count);
                 continue;
             }
         }
@@ -341,9 +357,14 @@ EOS_DECLARE_FUNC(void) EOS_LobbySearch_Find(
         bool matches = true;
         for (int p = 0; p < search->param_count && matches; p++) {
             matches = lobby_matches_param(l, &search->params[p]);
+            if (!matches) {
+                EOS_LOG_INFO("LobbySearch_Find:     REJECT param[%d] key='%s' no match (lobby has %d attrs)",
+                             p, search->params[p].key, l->attribute_count);
+            }
         }
 
         if (matches) {
+            EOS_LOG_INFO("LobbySearch_Find:     ACCEPT candidate[%d]", i);
             search->results[search->result_count++] = *l;
         }
     }
