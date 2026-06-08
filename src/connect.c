@@ -1,6 +1,7 @@
 #include "internal/connect_internal.h"
 #include "internal/auth_internal.h"
 #include "internal/logging.h"
+#include "internal/callbacks.h"
 #include "eos/eos_connect.h"
 #include "eos/eos_connect_types.h"
 #include <stdlib.h>
@@ -275,9 +276,14 @@ EOS_DECLARE_FUNC(void) EOS_Connect_Login(
         EOS_LOG_INFO("    Auth notifications fired");
     }
 
-    // Queue/call completion callback
-    if (CompletionDelegate) {
-        CompletionDelegate(&info);
+    // Defer completion to EOS_Platform_Tick. EOS never fires completion callbacks
+    // synchronously inside the API call — Palworld's EOS subsystem registers the op
+    // and waits for the callback on a later tick, so a synchronous call is dropped
+    // and the game reports "EOS login Timeout". Mirror the sessions/lobby pattern.
+    if (CompletionDelegate && state->platform && state->platform->callbacks) {
+        callback_queue_push(state->platform->callbacks, (void*)CompletionDelegate, &info, sizeof(info));
+    } else if (CompletionDelegate) {
+        CompletionDelegate(&info);  // no queue available: last resort
     }
 }
 
