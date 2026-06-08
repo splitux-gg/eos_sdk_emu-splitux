@@ -329,6 +329,21 @@ EOS_DECLARE_FUNC(void) EOS_LobbySearch_Find(
 
         EOS_LOG_INFO("LobbySearch_Find:   candidate[%d] id='%s' owner='%s' member_count=%d attribute_count=%d",
                      i, l->lobby_id, l->owner_id_string, l->member_count, l->attribute_count);
+        EOS_LOG_INFO("LobbySearch_Find:     cap: max_members=%u member_count=%d",
+                     l->max_members, l->member_count);
+        for (int a = 0; a < l->attribute_count; a++) {
+            const LobbyAttribute* la = &l->attributes[a];
+            if (la->type == EOS_AT_INT64) {
+                EOS_LOG_INFO("LobbySearch_Find:     attr '%s' = %lld (int64)",
+                             la->key, (long long)la->value.as_int64);
+            } else if (la->type == EOS_AT_BOOLEAN) {
+                EOS_LOG_INFO("LobbySearch_Find:     attr '%s' = %d (bool)",
+                             la->key, (int)la->value.as_bool);
+            } else if (la->type == EOS_AT_STRING) {
+                EOS_LOG_INFO("LobbySearch_Find:     attr '%s' = '%s' (str)",
+                             la->key, la->value.as_string);
+            }
+        }
 
         // Check lobby ID filter
         if (search->target_lobby_id[0] != '\0') {
