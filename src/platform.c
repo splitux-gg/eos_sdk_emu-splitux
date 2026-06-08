@@ -258,6 +258,11 @@ EOS_DECLARE_FUNC(void) EOS_Platform_Tick(EOS_HPlatform Handle) {
         lobby_tick(platform->lobby);
     }
 
+    // Drive the P2P transport (recv handshake/data, re-send CONNECTs, flush queue)
+    if (platform->p2p) {
+        p2p_tick(platform->p2p);
+    }
+
     // Process queued callbacks
     callback_queue_process(platform->callbacks);
 }

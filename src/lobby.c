@@ -662,10 +662,21 @@ EOS_DECLARE_FUNC(void) EOS_Lobby_CreateLobby(
         strncpy(l->bucket_id, Options->BucketId, sizeof(l->bucket_id) - 1);
     }
 
-    /* Best-effort peer address hint (IP:discovery_port) for P2P routing. */
-    if (get_local_ip(ip, sizeof(ip))) {
-        format_address(l->host_address, sizeof(l->host_address), ip,
-                       state->platform->lan_config.discovery_port);
+    /* Advertise the P2P listen address (IP:p2p_port) so a joining client knows
+     * where to send its CONNECT/DATA. Prefer the live bound port/ip from the
+     * P2P transport; fall back to the discovery port if P2P isn't up yet. */
+    {
+        uint16_t p2p_port = state->platform->p2p
+                                ? p2p_get_listen_port(state->platform->p2p) : 0;
+        const char* p2p_ip = state->platform->p2p
+                                 ? p2p_get_listen_ip(state->platform->p2p) : NULL;
+        if (p2p_ip && p2p_ip[0] && p2p_port != 0) {
+            format_address(l->host_address, sizeof(l->host_address), p2p_ip, p2p_port);
+        } else if (get_local_ip(ip, sizeof(ip))) {
+            uint16_t port = (p2p_port != 0) ? p2p_port
+                                            : state->platform->lan_config.discovery_port;
+            format_address(l->host_address, sizeof(l->host_address), ip, port);
+        }
     }
 
     l->created_at = get_time_ms();
