@@ -248,9 +248,36 @@ EOS_DECLARE_FUNC(EOS_EResult) EOS_Auth_CopyUserAuthToken(EOS_HAuth Handle, const
 }
 
 EOS_DECLARE_FUNC(EOS_EResult) EOS_Auth_CopyIdToken(EOS_HAuth Handle, const EOS_Auth_CopyIdTokenOptions* Options, EOS_Auth_IdToken** OutIdToken) {
-    EOS_LOG_INFO("Auth_CopyIdToken called");
-    if (OutIdToken) *OutIdToken = NULL;
-    return EOS_NotFound;
+    EOS_LOG_INFO(">>> EOS_Auth_CopyIdToken CALLED - logged_in=%d", g_auth_state.logged_in);
+    (void)Handle; (void)Options;
+    if (!OutIdToken) {
+        return EOS_InvalidParameters;
+    }
+    if (!g_auth_state.logged_in) {
+        *OutIdToken = NULL;
+        return EOS_NotFound;
+    }
+    // Return a fake ID token. Without this, UE5's FAuthEOS::Login EAS path fails
+    // (GetExternalAuthTokenImpl -> EOS_NotFound -> LoginEASImpl invalid_params ->
+    // "Has valid Epic Games login: No"), which locks the EOS-backed session type.
+    // JWT is a static structurally-valid placeholder; no real backend validates
+    // it in LAN play. Static string => EOS_Auth_IdToken_Release's single free() is
+    // correct (only the struct is heap-allocated).
+    EOS_Auth_IdToken* idtoken = calloc(1, sizeof(EOS_Auth_IdToken));
+    if (!idtoken) {
+        *OutIdToken = NULL;
+        return EOS_UnexpectedError;
+    }
+    idtoken->ApiVersion = EOS_AUTH_IDTOKEN_API_LATEST;
+    idtoken->AccountId = (EOS_EpicAccountId)&g_auth_state.account_id;
+    idtoken->JsonWebToken =
+        "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9."
+        "eyJzdWIiOiJMQU5fRkFLRSIsImlzcyI6Imh0dHBzOi8vYXBpLmVwaWNnYW1lcy5kZXYiL"
+        "CJhdWQiOiJMQU4iLCJleHAiOjQxMDI0NDQ4MDB9."
+        "LAN_FAKE_SIGNATURE";
+    EOS_LOG_INFO(">>> Returning fake IdToken with AccountId=%s", g_auth_state.account_id.id_string);
+    *OutIdToken = idtoken;
+    return EOS_Success;
 }
 
 EOS_DECLARE_FUNC(void) EOS_Auth_Token_Release(EOS_Auth_Token* AuthToken) {

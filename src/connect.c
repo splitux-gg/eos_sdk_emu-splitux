@@ -7,6 +7,9 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
+#ifdef _WIN32
+#include <windows.h>  // SEH (__try/__except, EXCEPTION_EXECUTE_HANDLER) for IsValid
+#endif
 
 // Magic number for validation
 #define CONNECT_MAGIC 0x434F4E4E  // "CONN"
@@ -490,21 +493,31 @@ EOS_DECLARE_FUNC(EOS_ELoginStatus) EOS_Connect_GetLoginStatus(EOS_HConnect Handl
 EOS_DECLARE_FUNC(EOS_Bool) EOS_ProductUserId_IsValid(EOS_ProductUserId AccountId) {
     if (!AccountId) return EOS_FALSE;
 
-    EOS_ProductUserIdDetails* id = (EOS_ProductUserIdDetails*)AccountId;
-    if (id->magic != PUID_MAGIC) return EOS_FALSE;
-
-    // Check string is valid hex, correct length
-    size_t len = strlen(id->id_string);
-    if (len != PRODUCT_USER_ID_LENGTH) return EOS_FALSE;
-
-    for (size_t i = 0; i < PRODUCT_USER_ID_LENGTH; i++) {
-        char c = id->id_string[i];
-        if (!((c >= '0' && c <= '9') || (c >= 'A' && c <= 'F') || (c >= 'a' && c <= 'f'))) {
-            return EOS_FALSE;
+    // Games hand IsValid stale/garbage ids; a validity *probe* must never crash.
+    // Guard the dereference with SEH so a bad pointer returns EOS_FALSE instead
+    // of faulting (the joiner crashed here reading 0x...ffffffff).
+    EOS_Bool result = EOS_FALSE;
+#ifdef _WIN32
+    __try {
+#endif
+        EOS_ProductUserIdDetails* id = (EOS_ProductUserIdDetails*)AccountId;
+        if (id->magic == PUID_MAGIC && strlen(id->id_string) == PRODUCT_USER_ID_LENGTH) {
+            result = EOS_TRUE;
+            for (size_t i = 0; i < PRODUCT_USER_ID_LENGTH; i++) {
+                char c = id->id_string[i];
+                if (!((c >= '0' && c <= '9') || (c >= 'A' && c <= 'F') || (c >= 'a' && c <= 'f'))) {
+                    result = EOS_FALSE;
+                    break;
+                }
+            }
         }
+#ifdef _WIN32
+    } __except (EXCEPTION_EXECUTE_HANDLER) {
+        EOS_LOG_WARN("EOS_ProductUserId_IsValid: bad pointer %p -> false", (void*)AccountId);
+        result = EOS_FALSE;
     }
-
-    return EOS_TRUE;
+#endif
+    return result;
 }
 
 EOS_DECLARE_FUNC(EOS_EResult) EOS_ProductUserId_ToString(

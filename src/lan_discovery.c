@@ -174,6 +174,13 @@ static bool parse_announcement(const uint8_t* buf, int len, Session* session) {
     session->owner_id_string[32] = '\0';
     offset += 32;
 
+    // Reconstruct a VALID LOCAL ProductUserId pointer from the string. Without
+    // this, session->owner_id is uninitialized garbage from the wire; when the
+    // game reads a discovered session's owner and calls EOS_ProductUserId_IsValid
+    // it dereferences that bad pointer and crashes (reading 0x...ffffffff) the
+    // instant you try to join. FromString returns a persistent local handle.
+    session->owner_id = EOS_ProductUserId_FromString(session->owner_id_string);
+
     if (offset + 10 > len) return false;
 
     // Max players

@@ -401,18 +401,30 @@ P2PState* p2p_create(PlatformState* platform) {
     state->nat_type = EOS_NAT_Open;  // Always Open for LAN
     state->nat_queried = true;
     state->relay_control = EOS_RC_AllowRelays;
-    state->port_range_start = 7777;
+    // Base P2P port. Default 7777, but overridable via EOSLAN_P2P_BASE_PORT so
+    // the emu can vacate 7777 for games whose OWN native IP/direct-connect
+    // netdriver wants it (e.g. Satisfactory "IP" session type binds UDP 7777 in
+    // this same process; our SO_EXCLUSIVEADDRUSE bind would otherwise refuse it).
+    uint16_t base_port = 7777;
+    {
+        const char* env = getenv("EOSLAN_P2P_BASE_PORT");
+        if (env && *env) {
+            int v = atoi(env);
+            if (v > 0 && v < 65536) base_port = (uint16_t)v;
+        }
+    }
+    state->port_range_start = base_port;
     state->port_range_count = 99;
     state->incoming_queue_max_bytes = DEFAULT_INCOMING_QUEUE_MAX;
     state->outgoing_queue_max_bytes = DEFAULT_OUTGOING_QUEUE_MAX;
 
-    // Bring up the LAN UDP transport. Base port 7777; lan_p2p falls back to the
-    // next free port (7778, ...) when 7777 is taken, so the host binds 7777 and
-    // a second local instance binds 7778. A failure here is non-fatal: the rest
-    // of the P2P API still operates (degraded) so we don't crash the game.
-    state->sock = lan_p2p_create(7777);
+    // Bring up the LAN UDP transport. lan_p2p falls back to the next free port
+    // when base_port is taken, so the host binds base_port and a second local
+    // instance binds base_port+1. A failure here is non-fatal: the rest of the
+    // P2P API still operates (degraded) so we don't crash the game.
+    state->sock = lan_p2p_create(base_port);
     if (!state->sock) {
-        EOS_LOG_ERROR("P2P: lan_p2p_create(7777) failed - P2P transport DEGRADED (no socket)");
+        EOS_LOG_ERROR("P2P: lan_p2p_create(%u) failed - P2P transport DEGRADED (no socket)", (unsigned)base_port);
     } else {
         EOS_LOG_INFO("P2P: LAN transport bound on %s:%u",
                      lan_p2p_get_local_ip(state->sock),
