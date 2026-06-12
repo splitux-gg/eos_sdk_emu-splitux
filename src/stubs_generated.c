@@ -611,12 +611,13 @@ EOS_DECLARE_FUNC(EOS_HRTCAdmin) EOS_Platform_GetRTCAdminInterface(EOS_HPlatform 
 }
 
 EOS_DECLARE_FUNC(EOS_HReports) EOS_Platform_GetReportsInterface(EOS_HPlatform Handle) {
-    return (EOS_HReports)0;
+    /* Non-null: UE5 OnlineServicesEOSGS FPlayerReportsEOSGS::Initialize asserts
+       this handle (PlayerReportsEOSGS.cpp:25). Return the platform handle like
+       the other interfaces; the Reports_* functions are stubbed. */
+    return (EOS_HReports)Handle;
 }
 
-EOS_DECLARE_FUNC(EOS_HSanctions) EOS_Platform_GetSanctionsInterface(EOS_HPlatform Handle) {
-    return (EOS_HSanctions)0;
-}
+/* EOS_Platform_GetSanctionsInterface — implemented in src/sanctions.c */
 
 EOS_DECLARE_FUNC(EOS_EResult) EOS_Platform_SetOverrideCountryCode(EOS_HPlatform Handle, const char* NewCountryCode) {
     return EOS_NotConfigured;
@@ -674,9 +675,7 @@ EOS_DECLARE_FUNC(EOS_NotificationId) EOS_Presence_AddNotifyJoinGameAccepted(EOS_
     return (EOS_NotificationId)0;
 }
 
-EOS_DECLARE_FUNC(EOS_EResult) EOS_Presence_GetJoinInfo(EOS_HPresence Handle, const EOS_Presence_GetJoinInfoOptions* Options, char* OutBuffer, int32_t* InOutBufferLength) {
-    return EOS_NotConfigured;
-}
+/* EOS_Presence_GetJoinInfo — implemented in src/social_bridge.c */
 
 EOS_DECLARE_FUNC(void) EOS_Presence_RemoveNotifyJoinGameAccepted(EOS_HPresence Handle, EOS_NotificationId InId) {
     (void)0;
@@ -794,17 +793,13 @@ EOS_DECLARE_FUNC(void) EOS_Sanctions_CreatePlayerSanctionAppeal(EOS_HSanctions H
     (void)0;
 }
 
-EOS_DECLARE_FUNC(uint32_t) EOS_Sanctions_GetPlayerSanctionCount(EOS_HSanctions Handle, const EOS_Sanctions_GetPlayerSanctionCountOptions* Options) {
-    return (uint32_t)0;
-}
+/* EOS_Sanctions_GetPlayerSanctionCount — implemented in src/sanctions.c */
 
 EOS_DECLARE_FUNC(void) EOS_Sanctions_PlayerSanction_Release(EOS_Sanctions_PlayerSanction* Sanction) {
     (void)0;
 }
 
-EOS_DECLARE_FUNC(void) EOS_Sanctions_QueryActivePlayerSanctions(EOS_HSanctions Handle, const EOS_Sanctions_QueryActivePlayerSanctionsOptions* Options, void* ClientData, const EOS_Sanctions_OnQueryActivePlayerSanctionsCallback CompletionDelegate) {
-    (void)0;
-}
+/* EOS_Sanctions_QueryActivePlayerSanctions — implemented in src/sanctions.c */
 
 EOS_DECLARE_FUNC(EOS_EResult) EOS_SessionModification_SetAllowedPlatformIds(EOS_HSessionModification Handle, const EOS_SessionModification_SetAllowedPlatformIdsOptions* Options) {
     return EOS_NotConfigured;
@@ -963,15 +958,42 @@ EOS_DECLARE_FUNC(void) EOS_UI_ShowReportPlayer(EOS_HUI Handle, const EOS_UI_Show
 }
 
 EOS_DECLARE_FUNC(void) EOS_UserInfo_BestDisplayName_Release(EOS_UserInfo_BestDisplayName* BestDisplayName) {
-    (void)0;
+    /* CopyBestDisplayName[WithPlatform] now heap-allocate; free here. Strings are
+       static literals, so only the struct is freed. */
+    if (BestDisplayName) free(BestDisplayName);
 }
 
 EOS_DECLARE_FUNC(EOS_EResult) EOS_UserInfo_CopyBestDisplayName(EOS_HUserInfo Handle, const EOS_UserInfo_CopyBestDisplayNameOptions* Options, EOS_UserInfo_BestDisplayName ** OutBestDisplayName) {
-    return EOS_NotConfigured;
+    /* Return a display name. UE5's FAuthEOS::Login EAS path requires this; a null
+       NotConfigured here fails LoginEASImpl (invalid_params) -> no valid Epic
+       login -> EOS session type locked. Static strings; Release frees the struct. */
+    (void)Handle;
+    if (!OutBestDisplayName) return EOS_InvalidParameters;
+    EOS_UserInfo_BestDisplayName* n = calloc(1, sizeof(EOS_UserInfo_BestDisplayName));
+    if (!n) { *OutBestDisplayName = NULL; return EOS_UnexpectedError; }
+    n->ApiVersion = EOS_USERINFO_BESTDISPLAYNAME_API_LATEST;
+    n->UserId = Options ? Options->TargetUserId : NULL;
+    n->DisplayName = "LAN_Player";
+    n->DisplayNameSanitized = "LAN_Player";
+    n->Nickname = NULL;
+    n->PlatformType = 0;
+    *OutBestDisplayName = n;
+    return EOS_Success;
 }
 
 EOS_DECLARE_FUNC(EOS_EResult) EOS_UserInfo_CopyBestDisplayNameWithPlatform(EOS_HUserInfo Handle, const EOS_UserInfo_CopyBestDisplayNameWithPlatformOptions* Options, EOS_UserInfo_BestDisplayName ** OutBestDisplayName) {
-    return EOS_NotConfigured;
+    (void)Handle;
+    if (!OutBestDisplayName) return EOS_InvalidParameters;
+    EOS_UserInfo_BestDisplayName* n = calloc(1, sizeof(EOS_UserInfo_BestDisplayName));
+    if (!n) { *OutBestDisplayName = NULL; return EOS_UnexpectedError; }
+    n->ApiVersion = EOS_USERINFO_BESTDISPLAYNAME_API_LATEST;
+    n->UserId = Options ? Options->TargetUserId : NULL;
+    n->DisplayName = "LAN_Player";
+    n->DisplayNameSanitized = "LAN_Player";
+    n->Nickname = NULL;
+    n->PlatformType = Options ? Options->TargetPlatformType : 0;
+    *OutBestDisplayName = n;
+    return EOS_Success;
 }
 
 EOS_DECLARE_FUNC(EOS_EResult) EOS_UserInfo_CopyExternalUserInfoByAccountId(EOS_HUserInfo Handle, const EOS_UserInfo_CopyExternalUserInfoByAccountIdOptions* Options, EOS_UserInfo_ExternalUserInfo ** OutExternalUserInfo) {

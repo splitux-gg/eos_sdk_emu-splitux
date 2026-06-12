@@ -44,4 +44,8 @@ typedef struct PlatformState {
 extern bool g_sdk_initialized;
 extern PlatformState* g_platforms[8];
 
+// Implemented in social_bridge.c — fires friends/presence notifications for
+// newly LAN-discovered peers. Called once per EOS_Platform_Tick.
+void social_bridge_tick(PlatformState* platform);
+
 #endif // EOS_PLATFORM_INTERNAL_H

@@ -254,6 +254,10 @@ EOS_DECLARE_FUNC(void) EOS_Platform_Tick(EOS_HPlatform Handle) {
         sessions_tick(platform->sessions);
     }
 
+    // Announce newly-discovered peers to the game via friends/presence
+    // notifications (so friends-list Join UIs refresh and show the host).
+    social_bridge_tick(platform);
+
     if (platform->lobby) {
         lobby_tick(platform->lobby);
     }

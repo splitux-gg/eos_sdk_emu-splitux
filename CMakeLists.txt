@@ -29,6 +29,9 @@ set(SOURCES
     src/lobby_details.c
     src/p2p.c
     src/integrated_platform.c
+    src/sanctions.c
+    src/social_bridge.c
+    src/missing_stubs.c
     src/stubs_generated.c
 )
 
@@ -54,6 +57,12 @@ if(WIN32)
     set_target_properties(${OUTPUT_NAME} PROPERTIES
         WINDOWS_EXPORT_ALL_SYMBOLS ON
     )
+    # Emit debug symbols even in Release so crash callstacks resolve our function
+    # names (otherwise the game's crash reporter shows EOSSDK!UnknownFunction).
+    # /Zi = full PDB info at compile; /DEBUG = keep it at link; /OPT:REF,ICF undo
+    # the size cost /DEBUG would otherwise disable. Deploy the .pdb beside the dll.
+    target_compile_options(${OUTPUT_NAME} PRIVATE /Zi)
+    target_link_options(${OUTPUT_NAME} PRIVATE /DEBUG /OPT:REF /OPT:ICF)
 else()
     # Linux/Unix settings
     target_compile_definitions(${OUTPUT_NAME} PRIVATE
