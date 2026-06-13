@@ -23,6 +23,37 @@ typedef struct DiscoveryService DiscoveryService;
 #define HOST_ADDRESS_LEN 64
 #define OWNER_ID_STRING_LEN 33
 #define SOURCE_IP_LEN 16
+// Presence bridging: the host's real join-info string + data records ride the
+// LAN announce so the joiner's EOS_Presence_GetJoinInfo/CopyPresence return
+// exactly what the host published (games parse their own join-info format).
+#define PRESENCE_JOININFO_LEN 256   // EOS_PRESENCE_DATA_MAX_VALUE_LENGTH + 1
+#define MAX_PRESENCE_RECORDS 8
+#define PRESENCE_KEY_LEN 65         // EOS_PRESENCE_DATA_MAX_KEY_LENGTH + 1
+#define PRESENCE_VALUE_LEN 256      // EOS_PRESENCE_DATA_MAX_VALUE_LENGTH + 1
+
+typedef struct {
+    char key[PRESENCE_KEY_LEN];
+    char value[PRESENCE_VALUE_LEN];
+} PresenceRecord;
+
+// User beacon: announces a user's EXISTENCE + presence on the LAN, independent
+// of any session. Needed because games (e.g. Satisfactory) build their join UI
+// from friends+presence — a host running a non-EOS session (Steam/Goldberg)
+// would otherwise never appear as a peer.
+#define MAX_USER_BEACONS 32
+#define PEER_DISPLAY_NAME_LEN 64
+
+typedef struct UserBeacon {
+    char epic_id[33];                       // 32-hex EpicAccountId string
+    char puid[33];                          // 32-hex ProductUserId string
+    char display_name[PEER_DISPLAY_NAME_LEN];
+    char join_info[PRESENCE_JOININFO_LEN];
+    PresenceRecord records[MAX_PRESENCE_RECORDS];
+    int record_count;
+    char source_ip[SOURCE_IP_LEN];
+    uint64_t last_seen;
+    bool valid;
+} UserBeacon;
 
 // Session attribute structure
 typedef struct {
@@ -73,6 +104,13 @@ typedef struct {
     // LAN tracking (for discovered sessions)
     char source_ip[SOURCE_IP_LEN];
     uint64_t last_seen;
+
+    // Owner's presence as published via EOS_Presence_SetPresence (host side:
+    // filled from social_bridge local presence before broadcast; joiner side:
+    // parsed from the announce packet).
+    char join_info[PRESENCE_JOININFO_LEN];
+    PresenceRecord presence_records[MAX_PRESENCE_RECORDS];
+    int presence_record_count;
 
     bool valid;
 } Session;
@@ -172,5 +210,23 @@ void sessions_tick(SessionsState* state);
 Session* find_local_session_by_name(SessionsState* state, const char* name);
 Session* find_local_session_by_id(SessionsState* state, const char* id);
 void generate_session_id(char* buffer, size_t buffer_size);
+
+// Implemented in social_bridge.c — the local user's presence as published via
+// EOS_Presence_SetPresence. sessions.c stamps these onto the LAN announce so
+// the joiner's GetJoinInfo/CopyPresence return the host's real data.
+const char* social_bridge_local_join_info(void);
+const PresenceRecord* social_bridge_local_records(int* out_count);
+
+// Resolve an external (Epic) account id string -> the matching ProductUserId:
+// the local user's own Connect id, or a discovered peer's (carried in its LAN
+// beacon as epic_id+puid). Used by EOS_Connect_GetExternalAccountMapping so the
+// game can resolve a joinable host's (and its own) identity during an EOS join.
+EOS_ProductUserId social_bridge_resolve_puid(PlatformState* platform, const char* epic_id);
+
+// Reverse of the above: given a ProductUserId string, return the EpicAccountId
+// string it belongs to (the local user, or a discovered peer carried in its LAN
+// beacon), or NULL if unknown. Used by EOS_Connect_GetProductUserIdMapping so the
+// game can turn a session owner's puid back into an Epic account during a join.
+const char* social_bridge_resolve_epic_by_puid(PlatformState* platform, const char* puid);
 
 #endif // EOS_LAN_SESSIONS_INTERNAL_H

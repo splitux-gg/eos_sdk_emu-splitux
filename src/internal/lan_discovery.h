@@ -53,6 +53,16 @@ void discovery_clear(DiscoveryService* ds);
 void discovery_set_broadcast_addr(DiscoveryService* ds, const char* addr);
 
 /**
+ * Broadcast a user beacon (user existence + presence, independent of sessions).
+ */
+void discovery_broadcast_user(DiscoveryService* ds, const UserBeacon* user);
+
+/**
+ * Get discovered user beacons.
+ */
+UserBeacon* discovery_get_users(DiscoveryService* ds, int* out_count);
+
+/**
  * Check if we should broadcast immediately (a query was received).
  * Also clears the flag after checking.
  */

@@ -6,6 +6,7 @@
 
 // Forward declaration
 typedef struct Session Session;
+typedef struct UserBeacon UserBeacon;
 
 typedef struct DiscoveryService DiscoveryService;
 

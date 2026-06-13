@@ -40,12 +40,42 @@ EOS_DECLARE_FUNC(const char*) EOS_GetVersion(void) { EOS_LOG_INFO("EOS_GetVersio
 // ============ EpicAccountId ============
 EOS_DECLARE_FUNC(EOS_EpicAccountId) EOS_EpicAccountId_FromString(const char* String) {
     EOS_LOG_INFO("EpicAccountId_FromString('%s')", String ? String : "NULL");
-    // Return our global auth account if we have one
     extern AuthState g_auth_state;
-    if (g_auth_state.logged_in) {
+
+    // Garbage/short input: keep the old back-compat behavior (hand back the local
+    // user) so degenerate callers don't crash.
+    if (!String || strlen(String) != EPIC_ACCOUNT_ID_LENGTH) {
+        return g_auth_state.logged_in ? (EOS_EpicAccountId)&g_auth_state.account_id : NULL;
+    }
+
+    // The local user's own id -> the canonical local handle (stable pointer).
+    if (g_auth_state.account_id.magic == EAID_MAGIC &&
+        strncmp(String, g_auth_state.account_id.id_string, EPIC_ACCOUNT_ID_LENGTH) == 0) {
         return (EOS_EpicAccountId)&g_auth_state.account_id;
     }
-    return NULL;
+
+    // Remote (peer/host) id. INTERN it so repeated FromString of the same epic
+    // returns the SAME handle — real EOS interns account ids and the game compares
+    // them. The previous stub returned the LOCAL account for EVERY string, which
+    // collapsed the host's identity onto the joiner and left the host user
+    // unresolvable during a join (UserKeyHandle:-1 / E011).
+    static EOS_EpicAccountIdDetails g_interned_epics[128];
+    static int g_interned_epic_count = 0;
+    for (int i = 0; i < g_interned_epic_count; i++) {
+        if (strncmp(g_interned_epics[i].id_string, String, EPIC_ACCOUNT_ID_LENGTH) == 0) {
+            return (EOS_EpicAccountId)&g_interned_epics[i];
+        }
+    }
+    if (g_interned_epic_count >= (int)(sizeof(g_interned_epics) / sizeof(g_interned_epics[0]))) {
+        EOS_LOG_WARN("EpicAccountId_FromString: intern table full, returning NULL");
+        return NULL;
+    }
+    EOS_EpicAccountIdDetails* id = &g_interned_epics[g_interned_epic_count++];
+    id->magic = EAID_MAGIC;
+    strncpy(id->id_string, String, EPIC_ACCOUNT_ID_LENGTH);
+    id->id_string[EPIC_ACCOUNT_ID_LENGTH] = '\0';
+    EOS_LOG_INFO("EpicAccountId_FromString: interned new remote id %s", id->id_string);
+    return (EOS_EpicAccountId)id;
 }
 EOS_DECLARE_FUNC(EOS_Bool) EOS_EpicAccountId_IsValid(EOS_EpicAccountId Id) {
     extern AuthState g_auth_state;
@@ -93,16 +123,34 @@ EOS_DECLARE_FUNC(EOS_Bool) EOS_EpicAccountId_IsValid(EOS_EpicAccountId Id) {
 }
 EOS_DECLARE_FUNC(EOS_EResult) EOS_EpicAccountId_ToString(EOS_EpicAccountId Id, char* OutBuffer, int32_t* InOutBufferLength) {
     extern AuthState g_auth_state;
-    // DEBUG: Accept NULL Id and return our account_id anyway (game might pass NULL)
-    if (OutBuffer && InOutBufferLength && *InOutBufferLength > 32 && g_auth_state.logged_in) {
-        strncpy(OutBuffer, g_auth_state.account_id.id_string, *InOutBufferLength - 1);
-        OutBuffer[*InOutBufferLength - 1] = '\0';
-        EOS_LOG_INFO("EpicAccountId_ToString(Id=%p) -> %s", (void*)Id, OutBuffer);
-        return EOS_Success;
+    if (!OutBuffer || !InOutBufferLength) return EOS_InvalidParameters;
+
+    // Stringify the ACTUAL id passed in — this is the whole point: a peer/host id
+    // must render as ITS OWN string, not the local user's. The old stub always
+    // emitted g_auth_state.account_id, so every remote id printed as the local
+    // user -> host identity collapsed onto the joiner (UserKeyHandle:-1).
+    const char* src = NULL;
+    EOS_EpicAccountIdDetails* d = (EOS_EpicAccountIdDetails*)Id;
+    if (d && d->magic == EAID_MAGIC) {
+        src = d->id_string;
+    } else if (!Id && g_auth_state.logged_in) {
+        src = g_auth_state.account_id.id_string;  // back-compat: NULL -> local user
     }
-    if (OutBuffer && InOutBufferLength && *InOutBufferLength > 0) { OutBuffer[0] = '\0'; }
-    EOS_LOG_WARN("EpicAccountId_ToString failed - buffer or logged_in issue");
-    return EOS_InvalidParameters;
+    if (!src) {
+        if (*InOutBufferLength > 0) OutBuffer[0] = '\0';
+        EOS_LOG_WARN("EpicAccountId_ToString: invalid Id %p", (void*)Id);
+        return EOS_InvalidUser;
+    }
+
+    int32_t required = EPIC_ACCOUNT_ID_LENGTH + 1;
+    if (*InOutBufferLength < required) {
+        *InOutBufferLength = required;
+        return EOS_LimitExceeded;
+    }
+    strcpy(OutBuffer, src);
+    *InOutBufferLength = required;
+    EOS_LOG_INFO("EpicAccountId_ToString(Id=%p) -> %s", (void*)Id, OutBuffer);
+    return EOS_Success;
 }
 
 // ============ EResult ============
@@ -169,15 +217,10 @@ EOS_DECLARE_FUNC(EOS_EResult) EOS_PlayerDataStorageFileTransferRequest_CancelReq
 EOS_DECLARE_FUNC(void) EOS_PlayerDataStorageFileTransferRequest_Release(EOS_HPlayerDataStorageFileTransferRequest Handle) { EOS_LOG_WARN("STUB called: %s", __func__); UNUSED(Handle); }
 
 // ============ Presence ============
-// QueryPresence / HasPresence / CopyPresence / GetJoinInfo / Info_Release are
+// QueryPresence / HasPresence / CopyPresence / GetJoinInfo / Info_Release and
+// the full PresenceModification surface (CreatePresenceModification /
+// SetPresence / SetStatus / SetRawRichText / SetData / Release) are
 // implemented in src/social_bridge.c (peer presence + join-info bridging).
-EOS_DECLARE_FUNC(EOS_EResult) EOS_Presence_CreatePresenceModification(EOS_HPresence Handle, const void* Options, void** Out) { EOS_LOG_WARN("STUB called: %s", __func__); UNUSED(Handle); UNUSED(Options); if(Out) *Out = NULL; return EOS_NotFound; }
-EOS_DECLARE_FUNC(void) EOS_Presence_SetPresence(EOS_HPresence Handle, const void* Options, void* ClientData, void* Callback) { EOS_LOG_WARN("STUB called: %s", __func__); UNUSED(Handle); UNUSED(Options); UNUSED(ClientData); UNUSED(Callback); }
-// EOS_Presence_AddNotifyOnPresenceChanged / RemoveNotifyOnPresenceChanged implemented in src/social_bridge.c
-EOS_DECLARE_FUNC(EOS_EResult) EOS_PresenceModification_SetStatus(EOS_HPresenceModification Handle, const void* Options) { EOS_LOG_WARN("STUB called: %s", __func__); UNUSED(Handle); UNUSED(Options); return EOS_Success; }
-EOS_DECLARE_FUNC(EOS_EResult) EOS_PresenceModification_SetRawRichText(EOS_HPresenceModification Handle, const void* Options) { EOS_LOG_WARN("STUB called: %s", __func__); UNUSED(Handle); UNUSED(Options); return EOS_Success; }
-EOS_DECLARE_FUNC(EOS_EResult) EOS_PresenceModification_SetData(EOS_HPresenceModification Handle, const void* Options) { EOS_LOG_WARN("STUB called: %s", __func__); UNUSED(Handle); UNUSED(Options); return EOS_Success; }
-EOS_DECLARE_FUNC(void) EOS_PresenceModification_Release(EOS_HPresenceModification Handle) { EOS_LOG_WARN("STUB called: %s", __func__); UNUSED(Handle); }
 
 // ============ RTC ============
 EOS_DECLARE_FUNC(void*) EOS_RTC_GetAudioInterface(EOS_HRTC Handle) { EOS_LOG_WARN("STUB called: %s", __func__); UNUSED(Handle); return NULL; }
@@ -230,40 +273,6 @@ EOS_DECLARE_FUNC(EOS_NotificationId) EOS_UI_AddNotifyDisplaySettingsUpdated(EOS_
 EOS_DECLARE_FUNC(void) EOS_UI_RemoveNotifyDisplaySettingsUpdated(EOS_HUI Handle, EOS_NotificationId Id) { EOS_LOG_WARN("STUB called: %s", __func__); UNUSED(Handle); UNUSED(Id); }
 
 // ============ UserInfo ============
-// Static user info struct for LAN player
-static struct {
-    int32_t ApiVersion;
-    EOS_EpicAccountId UserId;
-    const char* Country;
-    const char* DisplayName;
-    const char* PreferredLanguage;
-    const char* Nickname;
-    const char* DisplayNameSanitized;
-} g_lan_user_info = {0};
-
-EOS_DECLARE_FUNC(void) EOS_UserInfo_QueryUserInfo(EOS_HUserInfo Handle, const void* Options, void* ClientData, void* Callback) { EOS_LOG_WARN("STUB called: %s", __func__); UNUSED(Handle); UNUSED(Options); UNUSED(ClientData); UNUSED(Callback); }
-EOS_DECLARE_FUNC(void) EOS_UserInfo_QueryUserInfoByDisplayName(EOS_HUserInfo Handle, const void* Options, void* ClientData, void* Callback) { EOS_LOG_WARN("STUB called: %s", __func__); UNUSED(Handle); UNUSED(Options); UNUSED(ClientData); UNUSED(Callback); }
-EOS_DECLARE_FUNC(EOS_EResult) EOS_UserInfo_CopyUserInfo(EOS_HUserInfo Handle, const void* Options, void** Out) {
-    extern AuthState g_auth_state;
-    EOS_LOG_INFO(">>> EOS_UserInfo_CopyUserInfo CALLED");
-    if (Out && g_auth_state.logged_in) {
-        // Initialize the static user info
-        g_lan_user_info.ApiVersion = 3;
-        g_lan_user_info.UserId = (EOS_EpicAccountId)&g_auth_state.account_id;
-        g_lan_user_info.Country = "US";
-        g_lan_user_info.DisplayName = "LAN_Player";
-        g_lan_user_info.PreferredLanguage = "en";
-        g_lan_user_info.Nickname = "LAN_Player";
-        g_lan_user_info.DisplayNameSanitized = "LAN_Player";
-        *Out = &g_lan_user_info;
-        EOS_LOG_INFO("    Returning user info for %s", g_lan_user_info.DisplayName);
-        return EOS_Success;
-    }
-    EOS_LOG_WARN("    CopyUserInfo failed - Out=%p, logged_in=%d", Out, g_auth_state.logged_in);
-    if(Out) *Out = NULL;
-    return EOS_NotFound;
-}
-EOS_DECLARE_FUNC(void) EOS_UserInfo_Release(EOS_UserInfo* Info) {
-    EOS_LOG_INFO(">>> EOS_UserInfo_Release CALLED");
-    // Static struct, nothing to free
-}
+// QueryUserInfo / QueryUserInfoByDisplayName / CopyUserInfo / Release are
+// implemented in src/social_bridge.c (completing callbacks + per-target
+// display names from user beacons).

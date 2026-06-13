@@ -1,9 +1,11 @@
 #include "eos/eos_sessions.h"
 #include "eos/eos_sessions_types.h"
 #include "internal/sessions_internal.h"
+#include "eos/eos_connect.h"  // EOS_ProductUserId_ToString (stamp session owner)
 #include "internal/callbacks.h"
 #include "internal/lan_discovery.h"
 #include "internal/logging.h"
+#include "internal/p2p_internal.h"  // advertise/register the host's P2P endpoint
 #include "lan_common.h"
 #include <stdlib.h>
 #include <string.h>
@@ -155,6 +157,16 @@ void sessions_tick(SessionsState* state) {
         for (int i = 0; i < state->local_session_count; i++) {
             Session* s = &state->local_sessions[i];
             if (s->valid && s->state == EOS_OSS_Pending) {
+                // Stamp the host's published presence (real join-info string +
+                // data records) onto the announce so joiners can relay it.
+                const char* ji = social_bridge_local_join_info();
+                strncpy(s->join_info, ji, sizeof(s->join_info) - 1);
+                s->join_info[sizeof(s->join_info) - 1] = '\0';
+                int prc = 0;
+                const PresenceRecord* prs = social_bridge_local_records(&prc);
+                if (prc > MAX_PRESENCE_RECORDS) prc = MAX_PRESENCE_RECORDS;
+                memcpy(s->presence_records, prs, sizeof(PresenceRecord) * prc);
+                s->presence_record_count = prc;
                 discovery_broadcast_session(state->discovery, s);
                 EOS_LOG_DEBUG("Broadcasted session: %s", s->session_name);
             }
@@ -217,6 +229,18 @@ EOS_DECLARE_FUNC(EOS_EResult) EOS_Sessions_CreateSessionModification(
     strncpy(mod->session.bucket_id, Options->BucketId, sizeof(mod->session.bucket_id) - 1);
     mod->session.max_players = Options->MaxPlayers;
     mod->session.owner_id = Options->LocalUserId;
+    // Stamp the owner's ProductUserId STRING so it survives the LAN announce.
+    // owner_id is only a pointer (process-local); the wire carries owner_id_string
+    // (lan_discovery serializes it, the joiner FromString()s it back). Without this
+    // the host broadcasts a session with an EMPTY owner: the joiner can't resolve
+    // the host as the session owner and the discovered session also surfaces as a
+    // second, ownerless "friend". Contributes to the EOS join's UserKeyHandle:-1.
+    mod->session.owner_id_string[0] = '\0';
+    if (Options->LocalUserId) {
+        int32_t owner_len = OWNER_ID_STRING_LEN;
+        EOS_ProductUserId_ToString(Options->LocalUserId,
+                                   mod->session.owner_id_string, &owner_len);
+    }
     mod->session.presence_enabled = (Options->bPresenceEnabled == EOS_TRUE);
     mod->session.sanctions_enabled = (Options->bSanctionsEnabled == EOS_TRUE);
     mod->session.state = EOS_OSS_Pending;
@@ -318,6 +342,21 @@ EOS_DECLARE_FUNC(void) EOS_Sessions_UpdateSession(
         s->created_at = get_time_ms();
         s->last_updated = s->created_at;
         s->state = EOS_OSS_Pending;
+
+        // Advertise our P2P listen endpoint (IP:port) as the session host address
+        // so a joining client knows where to send its EOS-P2P CONNECT/DATA. Real
+        // EOS derives the route from the owner's puid; our LAN transport needs the
+        // concrete ip:port (mirrors the working lobby host_address path). Without
+        // it the joiner's NetDriverEOS connection has no target and times out at
+        // 60s ("addr pending" on the joiner / no packets received on the host).
+        if (state->platform && state->platform->p2p) {
+            uint16_t p2p_port = p2p_get_listen_port(state->platform->p2p);
+            const char* p2p_ip = p2p_get_listen_ip(state->platform->p2p);
+            if (p2p_ip && p2p_ip[0] && p2p_port != 0) {
+                format_address(s->host_address, sizeof(s->host_address), p2p_ip, p2p_port);
+                EOS_LOG_INFO(">>> Session host_address advertised as %s", s->host_address);
+            }
+        }
 
         state->local_session_count++;
 
@@ -499,6 +538,9 @@ EOS_DECLARE_FUNC(void) EOS_Sessions_JoinSession(
 ) {
     SessionsState* state = (SessionsState*)Handle;
 
+    EOS_LOG_INFO(">>> EOS_Sessions_JoinSession: name='%s'",
+                 (Options && Options->SessionName) ? Options->SessionName : "(null)");
+
     EOS_Sessions_JoinSessionCallbackInfo info = {0};
     info.ResultCode = EOS_InvalidParameters;
     info.ClientData = ClientData;
@@ -541,6 +583,17 @@ EOS_DECLARE_FUNC(void) EOS_Sessions_JoinSession(
     s->created_at = get_time_ms();
     s->last_updated = s->created_at;
     s->presence_enabled = (Options->bPresenceEnabled == EOS_TRUE);
+
+    // Register the host's P2P endpoint (carried in the session's host_address)
+    // against the host's puid, so EOS-P2P SendPacket to the owner routes to the
+    // right ip:port. Mirrors the lobby join path; without it the joiner's P2P
+    // connection stays "addr pending" and the NetDriverEOS handshake times out.
+    if (state->platform && state->platform->p2p &&
+        s->owner_id && s->host_address[0] != '\0') {
+        p2p_register_peer_address(state->platform->p2p, s->owner_id, s->host_address);
+        EOS_LOG_INFO(">>> JoinSession: registered host P2P endpoint %s for owner %s",
+                     s->host_address, s->owner_id_string);
+    }
 
     state->local_session_count++;
 
@@ -728,6 +781,7 @@ EOS_DECLARE_FUNC(EOS_EResult) EOS_Sessions_CreateSessionSearch(
     search->max_results = (Options->MaxSearchResults > 0) ? Options->MaxSearchResults : 10;
 
     *OutSessionSearchHandle = (EOS_HSessionSearch)search;
+    EOS_LOG_INFO(">>> EOS_Sessions_CreateSessionSearch: max_results=%u", search->max_results);
     return EOS_Success;
 }
 
@@ -780,6 +834,9 @@ EOS_DECLARE_FUNC(void) EOS_Sessions_SendInvite(
 ) {
     SessionsState* state = (SessionsState*)Handle;
 
+    EOS_LOG_INFO(">>> EOS_Sessions_SendInvite: session='%s' (pretending success)",
+                 (Options && Options->SessionName) ? Options->SessionName : "(null)");
+
     EOS_Sessions_SendInviteCallbackInfo info = {0};
     info.ResultCode = EOS_Success;  // Pretend it worked
     info.ClientData = ClientData;
@@ -814,6 +871,8 @@ EOS_DECLARE_FUNC(void) EOS_Sessions_QueryInvites(
 ) {
     SessionsState* state = (SessionsState*)Handle;
 
+    EOS_LOG_INFO(">>> EOS_Sessions_QueryInvites CALLED");
+
     EOS_Sessions_QueryInvitesCallbackInfo info = {0};
     info.ResultCode = EOS_Success;
     info.ClientData = ClientData;
@@ -830,6 +889,7 @@ EOS_DECLARE_FUNC(uint32_t) EOS_Sessions_GetInviteCount(
 ) {
     (void)Handle;
     (void)Options;
+    EOS_LOG_INFO(">>> EOS_Sessions_GetInviteCount -> 0 (no invites in LAN mode)");
     return 0;  // No invites in LAN mode
 }
 
@@ -843,7 +903,38 @@ EOS_DECLARE_FUNC(EOS_EResult) EOS_Sessions_GetInviteIdByIndex(
     (void)Options;
     (void)OutBuffer;
     (void)InOutBufferLength;
+    EOS_LOG_WARN(">>> EOS_Sessions_GetInviteIdByIndex -> NotFound (unimplemented)");
     return EOS_NotFound;
+}
+
+// Resolve a discovered (or local) session into a details handle, by session id.
+// Shared by CopySessionHandleByInviteId/ByUiEventId-style resolution paths.
+static EOS_EResult copy_details_by_session_id(SessionsState* state, const char* session_id, EOS_HSessionDetails* OutSessionHandle) {
+    if (!state || state->magic != 0x53455353 || !session_id || !OutSessionHandle) {
+        return EOS_InvalidParameters;
+    }
+    Session* found = NULL;
+    for (int i = 0; i < state->discovered_session_count; i++) {
+        Session* s = &state->discovered_sessions[i];
+        if (s->valid && strncmp(s->session_id, session_id, SESSION_ID_LEN) == 0) {
+            found = s;
+            break;
+        }
+    }
+    if (!found) {
+        found = find_local_session_by_id(state, session_id);
+    }
+    if (!found) {
+        return EOS_NotFound;
+    }
+    SessionDetailsHandle* details = calloc(1, sizeof(SessionDetailsHandle));
+    if (!details) {
+        return EOS_LimitExceeded;
+    }
+    details->magic = 0x53445448;
+    details->session = *found;
+    *OutSessionHandle = (EOS_HSessionDetails)details;
+    return EOS_Success;
 }
 
 EOS_DECLARE_FUNC(EOS_EResult) EOS_Sessions_CopySessionHandleByInviteId(
@@ -851,10 +942,14 @@ EOS_DECLARE_FUNC(EOS_EResult) EOS_Sessions_CopySessionHandleByInviteId(
     const EOS_Sessions_CopySessionHandleByInviteIdOptions* Options,
     EOS_HSessionDetails* OutSessionHandle
 ) {
-    (void)Handle;
-    (void)Options;
-    (void)OutSessionHandle;
-    return EOS_NotFound;
+    SessionsState* state = (SessionsState*)Handle;
+    const char* invite_id = (Options) ? Options->InviteId : NULL;
+    // LAN mode has no real invites; if the game passes a session id here
+    // (some flows reuse the join-info payload), resolve it as one.
+    EOS_EResult r = copy_details_by_session_id(state, invite_id, OutSessionHandle);
+    EOS_LOG_INFO(">>> EOS_Sessions_CopySessionHandleByInviteId: invite_id='%s' -> %d",
+                 invite_id ? invite_id : "(null)", (int)r);
+    return r;
 }
 
 EOS_DECLARE_FUNC(EOS_EResult) EOS_Sessions_CopySessionHandleByUiEventId(
@@ -863,8 +958,62 @@ EOS_DECLARE_FUNC(EOS_EResult) EOS_Sessions_CopySessionHandleByUiEventId(
     EOS_HSessionDetails* OutSessionHandle
 ) {
     (void)Handle;
-    (void)Options;
     (void)OutSessionHandle;
+    EOS_LOG_WARN(">>> EOS_Sessions_CopySessionHandleByUiEventId: ui_event_id=%llu -> NotFound (unimplemented)",
+                 (unsigned long long)(Options ? Options->UiEventId : 0));
+    return EOS_NotFound;
+}
+
+EOS_DECLARE_FUNC(EOS_EResult) EOS_Sessions_CopySessionHandleForPresence(
+    EOS_HSessions Handle,
+    const EOS_Sessions_CopySessionHandleForPresenceOptions* Options,
+    EOS_HSessionDetails* OutSessionHandle
+) {
+    SessionsState* state = (SessionsState*)Handle;
+    (void)Options;
+    if (!state || state->magic != 0x53455353 || !OutSessionHandle) {
+        EOS_LOG_WARN(">>> EOS_Sessions_CopySessionHandleForPresence: invalid params");
+        return EOS_InvalidParameters;
+    }
+    // The local user's presence-enabled session (set on create or join).
+    for (int i = 0; i < state->local_session_count; i++) {
+        Session* s = &state->local_sessions[i];
+        if (s->valid && s->presence_enabled) {
+            SessionDetailsHandle* details = calloc(1, sizeof(SessionDetailsHandle));
+            if (!details) return EOS_LimitExceeded;
+            details->magic = 0x53445448;
+            details->session = *s;
+            *OutSessionHandle = (EOS_HSessionDetails)details;
+            EOS_LOG_INFO(">>> EOS_Sessions_CopySessionHandleForPresence -> '%s'", s->session_name);
+            return EOS_Success;
+        }
+    }
+    EOS_LOG_INFO(">>> EOS_Sessions_CopySessionHandleForPresence -> NotFound (no presence session)");
+    return EOS_NotFound;
+}
+
+EOS_DECLARE_FUNC(EOS_EResult) EOS_Sessions_IsUserInSession(
+    EOS_HSessions Handle,
+    const EOS_Sessions_IsUserInSessionOptions* Options
+) {
+    SessionsState* state = (SessionsState*)Handle;
+    if (!state || state->magic != 0x53455353 || !Options || !Options->SessionName) {
+        return EOS_InvalidParameters;
+    }
+    Session* s = find_local_session_by_name(state, Options->SessionName);
+    if (!s) {
+        EOS_LOG_INFO(">>> EOS_Sessions_IsUserInSession: session '%s' not found", Options->SessionName);
+        return EOS_NotFound;
+    }
+    if (Options->TargetUserId == s->owner_id) {
+        return EOS_Success;
+    }
+    for (int i = 0; i < s->registered_player_count; i++) {
+        if (s->registered_players[i] == Options->TargetUserId) {
+            return EOS_Success;
+        }
+    }
+    EOS_LOG_INFO(">>> EOS_Sessions_IsUserInSession: user not in '%s'", Options->SessionName);
     return EOS_NotFound;
 }
 

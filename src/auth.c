@@ -38,21 +38,57 @@ BOOL WINAPI DllMain(HINSTANCE hinstDLL, DWORD fdwReason, LPVOID lpvReserved) {
 #else
 __attribute__((constructor))
 #endif
+// Local display name: EOSLAN_USERNAME env var (set per-instance by the bench)
+// so each player gets a distinct name in friends/join UIs; falls back to the
+// historical "LAN_Player".
+static const char* local_username(void) {
+    const char* n = getenv("EOSLAN_USERNAME");
+    return (n && n[0]) ? n : "LAN_Player";
+}
+
+// ---- Deterministic, instance-stable identity generation --------------------
+// EpicAccountId and ProductUserId must be IDENTICAL across every process of one
+// game instance (Satisfactory loads the emu in BOTH the bootstrap launcher and
+// the shipping process) and across every re-login. UE's FOnlineAccountIdRegistryEOS
+// enforces a strict one-puid<->one-epic invariant (check(InProductUserId ==
+// FoundProductUserId) in FindOrAddAccountId); a random epic per process/login
+// produced TWO epics for one deterministic puid, so the host's account could
+// never register -> the joiner's owner resolution returned UserKeyHandle:-1 / E011.
+// We derive both ids from a hash of EOSLAN_USERNAME (stable per instance, distinct
+// between instances). Uses a self-contained PRNG (splitmix64) rather than
+// srand/rand so the result is bit-identical across processes and platforms.
+uint64_t eosdet_seed(const char* salt, const char* s) {
+    uint64_t h = 1469598103934665603ULL;  // FNV-1a offset basis
+    for (const char* p = salt; *p; p++) { h ^= (unsigned char)*p; h *= 1099511628211ULL; }
+    for (const char* p = s; p && *p; p++) { h ^= (unsigned char)*p; h *= 1099511628211ULL; }
+    return h;
+}
+
+void eosdet_fill_hex(char* out, int len, uint64_t seed, const char* digits16) {
+    for (int i = 0; i < len; i++) {
+        seed += 0x9E3779B97F4A7C15ULL;
+        uint64_t z = seed;
+        z = (z ^ (z >> 30)) * 0xBF58476D1CE4E5B9ULL;
+        z = (z ^ (z >> 27)) * 0x94D049BB133111EBULL;
+        z = z ^ (z >> 31);
+        out[i] = digits16[z & 0xF];
+    }
+    out[len] = '\0';
+}
+
 static void auth_dll_init(void) {
     // Initialize auth state with a valid EpicAccountId at DLL load time
     // This ensures the ID is available BEFORE any EOS functions are called
     g_auth_state.account_id.magic = EAID_MAGIC;
 
-    // Generate deterministic ID based on process ID for consistency
-    unsigned int seed = 12345;  // Fixed seed for now
-    srand(seed);
-    for (int i = 0; i < EPIC_ACCOUNT_ID_LENGTH; i++) {
-        int r = rand() % 16;
-        g_auth_state.account_id.id_string[i] = (r < 10) ? ('0' + r) : ('a' + r - 10);
-    }
-    g_auth_state.account_id.id_string[EPIC_ACCOUNT_ID_LENGTH] = '\0';
+    // Deterministic, instance-stable EpicAccountId (see eosdet_* above). Was a
+    // FIXED seed (12345) -> identical for EVERY instance (Player0 and Player1
+    // collided); now derived from EOSLAN_USERNAME so it's stable per instance
+    // and distinct between instances.
+    eosdet_fill_hex(g_auth_state.account_id.id_string, EPIC_ACCOUNT_ID_LENGTH,
+                    eosdet_seed("epic:", local_username()), "0123456789abcdef");
     g_auth_state.logged_in = false;  // Start NotLoggedIn like Nemirtingas
-    strncpy(g_auth_state.display_name, "LAN_Player", sizeof(g_auth_state.display_name) - 1);
+    strncpy(g_auth_state.display_name, local_username(), sizeof(g_auth_state.display_name) - 1);
 
     // Log the initialization
     EOS_LOG_INFO("=== DLL INIT (auth_dll_init) ===");
@@ -71,13 +107,13 @@ void auth_init(void) {
 static void generate_epic_account_id(EOS_EpicAccountIdDetails* id) {
     id->magic = EAID_MAGIC;
 
-    // Generate random-looking ID
-    srand((unsigned int)time(NULL) ^ (unsigned int)(uintptr_t)id);
-    for (int i = 0; i < EPIC_ACCOUNT_ID_LENGTH; i++) {
-        int r = rand() % 16;
-        id->id_string[i] = (r < 10) ? ('0' + r) : ('a' + r - 10);
-    }
-    id->id_string[EPIC_ACCOUNT_ID_LENGTH] = '\0';
+    // Deterministic per-instance EpicAccountId: identical across the instance's
+    // processes (bootstrap + shipping) and across every re-login, distinct
+    // between instances. Was random per call (time ^ ptr) -> the boot login and
+    // token login minted DIFFERENT epics for one puid, violating UE's
+    // one-puid<->one-epic registry invariant -> UserKeyHandle:-1 / E011.
+    eosdet_fill_hex(id->id_string, EPIC_ACCOUNT_ID_LENGTH,
+                    eosdet_seed("epic:", local_username()), "0123456789abcdef");
 }
 
 // Auto-login for LAN play - called during platform creation
@@ -93,7 +129,7 @@ void auth_auto_login(void) {
 
     generate_epic_account_id(&g_auth_state.account_id);
     g_auth_state.logged_in = true;
-    strncpy(g_auth_state.display_name, "LAN_Player", sizeof(g_auth_state.display_name) - 1);
+    strncpy(g_auth_state.display_name, local_username(), sizeof(g_auth_state.display_name) - 1);
 
     EOS_LOG_INFO("    Auto-login complete: EpicAccountId=%s (ptr=%p)",
                  g_auth_state.account_id.id_string, (void*)&g_auth_state.account_id);
@@ -120,7 +156,7 @@ EOS_DECLARE_FUNC(void) EOS_Auth_Login(EOS_HAuth Handle, const EOS_Auth_LoginOpti
     // Generate fake Epic account
     generate_epic_account_id(&g_auth_state.account_id);
     g_auth_state.logged_in = true;
-    strncpy(g_auth_state.display_name, "LAN_Player", sizeof(g_auth_state.display_name) - 1);
+    strncpy(g_auth_state.display_name, local_username(), sizeof(g_auth_state.display_name) - 1);
 
     EOS_LOG_INFO("    Auth_Login SUCCESS - EpicAccountId=%s (ptr=%p)",
                  g_auth_state.account_id.id_string, (void*)&g_auth_state.account_id);
@@ -276,6 +312,10 @@ EOS_DECLARE_FUNC(EOS_EResult) EOS_Auth_CopyIdToken(EOS_HAuth Handle, const EOS_A
         "CJhdWQiOiJMQU4iLCJleHAiOjQxMDI0NDQ4MDB9."
         "LAN_FAKE_SIGNATURE";
     EOS_LOG_INFO(">>> Returning fake IdToken with AccountId=%s", g_auth_state.account_id.id_string);
+    // The JWT payload is a STATIC sub:"LAN_FAKE" — it does NOT carry the real
+    // EpicAccountId, so when the game later feeds this token to
+    // Connect_Login(Type=16) we can't recover the epic id from the token; the
+    // identity comes from the local g_auth_state (deterministic per instance).
     *OutIdToken = idtoken;
     return EOS_Success;
 }

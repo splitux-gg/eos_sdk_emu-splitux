@@ -7,6 +7,9 @@
  */
 #include "eos/eos_sdk.h"
 #include "eos/eos_logging.h"
+#include "internal/logging.h"
+#include <stdlib.h>
+#include <string.h>
 #include "eos/eos_stats.h"
 #include "eos/eos_leaderboards.h"
 #include "eos/eos_anticheatserver.h"
@@ -655,13 +658,7 @@ EOS_DECLARE_FUNC(void) EOS_PlayerDataStorage_QueryFile(EOS_HPlayerDataStorage Ha
     (void)0;
 }
 
-EOS_DECLARE_FUNC(EOS_EResult) EOS_PresenceModification_DeleteData(EOS_HPresenceModification Handle, const EOS_PresenceModification_DeleteDataOptions* Options) {
-    return EOS_NotConfigured;
-}
-
-EOS_DECLARE_FUNC(EOS_EResult) EOS_PresenceModification_SetJoinInfo(EOS_HPresenceModification Handle, const EOS_PresenceModification_SetJoinInfoOptions* Options) {
-    return EOS_NotConfigured;
-}
+/* EOS_PresenceModification_DeleteData / SetJoinInfo — implemented in src/social_bridge.c */
 
 EOS_DECLARE_FUNC(EOS_EResult) EOS_PresenceModification_SetTemplateData(EOS_HPresenceModification Handle, const EOS_PresenceModification_SetTemplateDataOptions* Options) {
     return EOS_NotConfigured;
@@ -806,26 +803,23 @@ EOS_DECLARE_FUNC(EOS_EResult) EOS_SessionModification_SetAllowedPlatformIds(EOS_
 }
 
 EOS_DECLARE_FUNC(EOS_NotificationId) EOS_Sessions_AddNotifyLeaveSessionRequested(EOS_HSessions Handle, const EOS_Sessions_AddNotifyLeaveSessionRequestedOptions* Options, void* ClientData, const EOS_Sessions_OnLeaveSessionRequestedCallback NotificationFn) {
+    EOS_LOG_INFO(">>> %s registered (stub, never fires)", __func__);
     return (EOS_NotificationId)0;
 }
 
 EOS_DECLARE_FUNC(EOS_NotificationId) EOS_Sessions_AddNotifySendSessionNativeInviteRequested(EOS_HSessions Handle, const EOS_Sessions_AddNotifySendSessionNativeInviteRequestedOptions* Options, void* ClientData, const EOS_Sessions_OnSendSessionNativeInviteRequestedCallback NotificationFn) {
+    EOS_LOG_INFO(">>> %s registered (stub, never fires)", __func__);
     return (EOS_NotificationId)0;
 }
 
 EOS_DECLARE_FUNC(EOS_NotificationId) EOS_Sessions_AddNotifySessionInviteRejected(EOS_HSessions Handle, const EOS_Sessions_AddNotifySessionInviteRejectedOptions* Options, void* ClientData, const EOS_Sessions_OnSessionInviteRejectedCallback NotificationFn) {
+    EOS_LOG_INFO(">>> %s registered (stub, never fires)", __func__);
     return (EOS_NotificationId)0;
 }
 
-EOS_DECLARE_FUNC(EOS_EResult) EOS_Sessions_CopySessionHandleForPresence(EOS_HSessions Handle, const EOS_Sessions_CopySessionHandleForPresenceOptions* Options, EOS_HSessionDetails* OutSessionHandle) {
-    return EOS_NotConfigured;
-}
+/* EOS_Sessions_CopySessionHandleForPresence / IsUserInSession — implemented in src/sessions.c */
 
 EOS_DECLARE_FUNC(EOS_EResult) EOS_Sessions_DumpSessionState(EOS_HSessions Handle, const EOS_Sessions_DumpSessionStateOptions* Options) {
-    return EOS_NotConfigured;
-}
-
-EOS_DECLARE_FUNC(EOS_EResult) EOS_Sessions_IsUserInSession(EOS_HSessions Handle, const EOS_Sessions_IsUserInSessionOptions* Options) {
     return EOS_NotConfigured;
 }
 
@@ -957,43 +951,47 @@ EOS_DECLARE_FUNC(void) EOS_UI_ShowReportPlayer(EOS_HUI Handle, const EOS_UI_Show
     (void)0;
 }
 
+/* Implemented in src/social_bridge.c — per-target names from user beacons. */
+extern const char* social_bridge_display_name_for(EOS_EpicAccountId id);
+
 EOS_DECLARE_FUNC(void) EOS_UserInfo_BestDisplayName_Release(EOS_UserInfo_BestDisplayName* BestDisplayName) {
-    /* CopyBestDisplayName[WithPlatform] now heap-allocate; free here. Strings are
-       static literals, so only the struct is freed. */
+    /* CopyBestDisplayName[WithPlatform] heap-allocate one block (struct + name
+       storage); freeing the struct frees everything. */
     if (BestDisplayName) free(BestDisplayName);
 }
 
-EOS_DECLARE_FUNC(EOS_EResult) EOS_UserInfo_CopyBestDisplayName(EOS_HUserInfo Handle, const EOS_UserInfo_CopyBestDisplayNameOptions* Options, EOS_UserInfo_BestDisplayName ** OutBestDisplayName) {
+/* One block: struct + embedded name storage, so Release can free it all. */
+typedef struct {
+    EOS_UserInfo_BestDisplayName bdn;
+    char name[64];
+} BestDisplayNameBlock;
+
+static EOS_EResult copy_best_display_name(const EOS_EpicAccountId target, int32_t platform_type, EOS_UserInfo_BestDisplayName** OutBestDisplayName) {
     /* Return a display name. UE5's FAuthEOS::Login EAS path requires this; a null
        NotConfigured here fails LoginEASImpl (invalid_params) -> no valid Epic
-       login -> EOS session type locked. Static strings; Release frees the struct. */
-    (void)Handle;
+       login -> EOS session type locked. */
     if (!OutBestDisplayName) return EOS_InvalidParameters;
-    EOS_UserInfo_BestDisplayName* n = calloc(1, sizeof(EOS_UserInfo_BestDisplayName));
-    if (!n) { *OutBestDisplayName = NULL; return EOS_UnexpectedError; }
-    n->ApiVersion = EOS_USERINFO_BESTDISPLAYNAME_API_LATEST;
-    n->UserId = Options ? Options->TargetUserId : NULL;
-    n->DisplayName = "LAN_Player";
-    n->DisplayNameSanitized = "LAN_Player";
-    n->Nickname = NULL;
-    n->PlatformType = 0;
-    *OutBestDisplayName = n;
+    BestDisplayNameBlock* blk = calloc(1, sizeof(BestDisplayNameBlock));
+    if (!blk) { *OutBestDisplayName = NULL; return EOS_UnexpectedError; }
+    strncpy(blk->name, social_bridge_display_name_for(target), sizeof(blk->name) - 1);
+    blk->bdn.ApiVersion = EOS_USERINFO_BESTDISPLAYNAME_API_LATEST;
+    blk->bdn.UserId = target;
+    blk->bdn.DisplayName = blk->name;
+    blk->bdn.DisplayNameSanitized = blk->name;
+    blk->bdn.Nickname = NULL;
+    blk->bdn.PlatformType = platform_type;
+    *OutBestDisplayName = &blk->bdn;
     return EOS_Success;
+}
+
+EOS_DECLARE_FUNC(EOS_EResult) EOS_UserInfo_CopyBestDisplayName(EOS_HUserInfo Handle, const EOS_UserInfo_CopyBestDisplayNameOptions* Options, EOS_UserInfo_BestDisplayName ** OutBestDisplayName) {
+    (void)Handle;
+    return copy_best_display_name(Options ? Options->TargetUserId : NULL, 0, OutBestDisplayName);
 }
 
 EOS_DECLARE_FUNC(EOS_EResult) EOS_UserInfo_CopyBestDisplayNameWithPlatform(EOS_HUserInfo Handle, const EOS_UserInfo_CopyBestDisplayNameWithPlatformOptions* Options, EOS_UserInfo_BestDisplayName ** OutBestDisplayName) {
     (void)Handle;
-    if (!OutBestDisplayName) return EOS_InvalidParameters;
-    EOS_UserInfo_BestDisplayName* n = calloc(1, sizeof(EOS_UserInfo_BestDisplayName));
-    if (!n) { *OutBestDisplayName = NULL; return EOS_UnexpectedError; }
-    n->ApiVersion = EOS_USERINFO_BESTDISPLAYNAME_API_LATEST;
-    n->UserId = Options ? Options->TargetUserId : NULL;
-    n->DisplayName = "LAN_Player";
-    n->DisplayNameSanitized = "LAN_Player";
-    n->Nickname = NULL;
-    n->PlatformType = Options ? Options->TargetPlatformType : 0;
-    *OutBestDisplayName = n;
-    return EOS_Success;
+    return copy_best_display_name(Options ? Options->TargetUserId : NULL, Options ? Options->TargetPlatformType : 0, OutBestDisplayName);
 }
 
 EOS_DECLARE_FUNC(EOS_EResult) EOS_UserInfo_CopyExternalUserInfoByAccountId(EOS_HUserInfo Handle, const EOS_UserInfo_CopyExternalUserInfoByAccountIdOptions* Options, EOS_UserInfo_ExternalUserInfo ** OutExternalUserInfo) {

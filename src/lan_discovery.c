@@ -23,9 +23,12 @@ typedef int socklen_t;
 #endif
 
 #define DISCOVERY_MAGIC "EOSLAN"
-#define DISCOVERY_VERSION 0x0001
+// v2: announce carries the host's presence join-info string + data records
+// (fixed-size block between the session flags and the attribute list).
+#define DISCOVERY_VERSION 0x0002
 #define MSG_ANNOUNCE 0x01
 #define MSG_QUERY 0x02
+#define MSG_USER_BEACON 0x03
 
 #define MAX_CACHED_SESSIONS 64
 /* Lobbies carry many attributes (Palworld sets ~24, each string value
@@ -52,6 +55,9 @@ struct DiscoveryService {
 
     CachedSession cache[MAX_CACHED_SESSIONS];
     int cache_count;
+
+    UserBeacon user_cache[MAX_USER_BEACONS];
+    int user_count;
 
     uint8_t recv_buffer[MAX_PACKET_SIZE];
     uint8_t send_buffer[MAX_PACKET_SIZE];
@@ -194,10 +200,40 @@ static bool parse_announcement(const uint8_t* buf, int len, Session* session) {
     // State
     session->state = (EOS_EOnlineSessionState)buf[offset++];
 
-    // Flags
+    // Flags: bit0=join-in-progress, bits1-2=permission level (0/1/2 — must carry
+    // JoinViaPresence=1, not collapse it to InviteOnly), bit3=presence-enabled,
+    // bit4=sanctions-enabled, bit5=invites-allowed. The old format only stored a
+    // single PublicAdvertised bit, so a JoinViaPresence host session was decoded
+    // as InviteOnly here (and presence/sanctions read uninitialized garbage) —
+    // the joiner then never saw the host's game as a joinable friend session.
     uint8_t flags = buf[offset++];
     session->join_in_progress_allowed = (flags & 0x01) != 0;
-    session->permission_level = (flags & 0x02) ? EOS_OSPF_PublicAdvertised : EOS_OSPF_InviteOnly;
+    session->permission_level = (EOS_EOnlineSessionPermissionLevel)((flags >> 1) & 0x03);
+    session->presence_enabled = (flags & 0x08) != 0;
+    session->sanctions_enabled = (flags & 0x10) != 0;
+    session->invites_allowed = (flags & 0x20) != 0;
+
+    // v2: presence join-info string (fixed 256 bytes)
+    if (offset + PRESENCE_JOININFO_LEN > len) return false;
+    memcpy(session->join_info, buf + offset, PRESENCE_JOININFO_LEN);
+    session->join_info[PRESENCE_JOININFO_LEN - 1] = '\0';
+    offset += PRESENCE_JOININFO_LEN;
+
+    // v2: presence data records (count + fixed key/value pairs)
+    if (offset + 1 > len) return false;
+    uint8_t prec_count = buf[offset++];
+    if (prec_count > MAX_PRESENCE_RECORDS) prec_count = MAX_PRESENCE_RECORDS;
+    session->presence_record_count = 0;
+    for (int i = 0; i < prec_count; i++) {
+        if (offset + PRESENCE_KEY_LEN + PRESENCE_VALUE_LEN > len) return false;
+        memcpy(session->presence_records[i].key, buf + offset, PRESENCE_KEY_LEN);
+        session->presence_records[i].key[PRESENCE_KEY_LEN - 1] = '\0';
+        offset += PRESENCE_KEY_LEN;
+        memcpy(session->presence_records[i].value, buf + offset, PRESENCE_VALUE_LEN);
+        session->presence_records[i].value[PRESENCE_VALUE_LEN - 1] = '\0';
+        offset += PRESENCE_VALUE_LEN;
+        session->presence_record_count++;
+    }
 
     if (offset + 2 > len) return false;
 
@@ -240,6 +276,112 @@ static void add_to_cache(DiscoveryService* ds, const Session* session, const cha
         ds->cache[ds->cache_count].received_at = get_time_ms();
         ds->cache_count++;
     }
+}
+
+// ===== User beacons (user existence + presence, independent of sessions) =====
+
+static void add_user_to_cache(DiscoveryService* ds, const UserBeacon* user, const char* source_ip) {
+    if (!ds || !user) return;
+    for (int i = 0; i < ds->user_count; i++) {
+        if (strncmp(ds->user_cache[i].epic_id, user->epic_id, 32) == 0) {
+            UserBeacon* slot = &ds->user_cache[i];
+            *slot = *user;
+            strncpy(slot->source_ip, source_ip, sizeof(slot->source_ip) - 1);
+            slot->source_ip[sizeof(slot->source_ip) - 1] = '\0';
+            slot->last_seen = get_time_ms();
+            slot->valid = true;
+            return;
+        }
+    }
+    if (ds->user_count < MAX_USER_BEACONS) {
+        UserBeacon* slot = &ds->user_cache[ds->user_count++];
+        *slot = *user;
+        strncpy(slot->source_ip, source_ip, sizeof(slot->source_ip) - 1);
+        slot->source_ip[sizeof(slot->source_ip) - 1] = '\0';
+        slot->last_seen = get_time_ms();
+        slot->valid = true;
+        EOS_LOG_INFO("Discovered user beacon: '%s' (%s) from %s", slot->display_name, slot->epic_id, source_ip);
+    }
+}
+
+void discovery_broadcast_user(DiscoveryService* ds, const UserBeacon* user) {
+    if (!ds || !user) return;
+
+    uint8_t* buf = ds->send_buffer;
+    int offset = 0;
+
+    memcpy(buf + offset, DISCOVERY_MAGIC, 6); offset += 6;
+    *(uint16_t*)(buf + offset) = htons(DISCOVERY_VERSION); offset += 2;
+    buf[offset++] = MSG_USER_BEACON;
+
+    memset(buf + offset, 0, 33);
+    strncpy((char*)(buf + offset), user->epic_id, 32); offset += 33;
+    memset(buf + offset, 0, 33);
+    strncpy((char*)(buf + offset), user->puid, 32); offset += 33;
+    memset(buf + offset, 0, PEER_DISPLAY_NAME_LEN);
+    strncpy((char*)(buf + offset), user->display_name, PEER_DISPLAY_NAME_LEN - 1); offset += PEER_DISPLAY_NAME_LEN;
+    memset(buf + offset, 0, PRESENCE_JOININFO_LEN);
+    strncpy((char*)(buf + offset), user->join_info, PRESENCE_JOININFO_LEN - 1); offset += PRESENCE_JOININFO_LEN;
+
+    uint8_t prec_count = (user->record_count > MAX_PRESENCE_RECORDS)
+        ? MAX_PRESENCE_RECORDS : (uint8_t)user->record_count;
+    buf[offset++] = prec_count;
+    for (int i = 0; i < prec_count; i++) {
+        memset(buf + offset, 0, PRESENCE_KEY_LEN);
+        strncpy((char*)(buf + offset), user->records[i].key, PRESENCE_KEY_LEN - 1);
+        offset += PRESENCE_KEY_LEN;
+        memset(buf + offset, 0, PRESENCE_VALUE_LEN);
+        strncpy((char*)(buf + offset), user->records[i].value, PRESENCE_VALUE_LEN - 1);
+        offset += PRESENCE_VALUE_LEN;
+    }
+
+    struct sockaddr_in dest = {0};
+    dest.sin_family = AF_INET;
+    dest.sin_port = htons(ds->port);
+    inet_pton(AF_INET, ds->broadcast_addr, &dest.sin_addr);
+    sendto(ds->socket_fd, (const char*)buf, offset, 0, (struct sockaddr*)&dest, sizeof(dest));
+
+    if (ds->localhost_mode) {
+        struct sockaddr_in lo = {0};
+        lo.sin_family = AF_INET;
+        lo.sin_port = htons(ds->port);
+        inet_pton(AF_INET, "127.255.255.255", &lo.sin_addr);
+        sendto(ds->socket_fd, (const char*)buf, offset, 0, (struct sockaddr*)&lo, sizeof(lo));
+    }
+}
+
+static bool parse_user_beacon(const uint8_t* buf, int len, UserBeacon* user) {
+    int offset = 0;
+    memset(user, 0, sizeof(*user));
+
+    if (offset + 33 + 33 + PEER_DISPLAY_NAME_LEN + PRESENCE_JOININFO_LEN + 1 > len) return false;
+    memcpy(user->epic_id, buf + offset, 32); user->epic_id[32] = '\0'; offset += 33;
+    memcpy(user->puid, buf + offset, 32); user->puid[32] = '\0'; offset += 33;
+    memcpy(user->display_name, buf + offset, PEER_DISPLAY_NAME_LEN);
+    user->display_name[PEER_DISPLAY_NAME_LEN - 1] = '\0'; offset += PEER_DISPLAY_NAME_LEN;
+    memcpy(user->join_info, buf + offset, PRESENCE_JOININFO_LEN);
+    user->join_info[PRESENCE_JOININFO_LEN - 1] = '\0'; offset += PRESENCE_JOININFO_LEN;
+
+    uint8_t prec_count = buf[offset++];
+    if (prec_count > MAX_PRESENCE_RECORDS) prec_count = MAX_PRESENCE_RECORDS;
+    for (int i = 0; i < prec_count; i++) {
+        if (offset + PRESENCE_KEY_LEN + PRESENCE_VALUE_LEN > len) return false;
+        memcpy(user->records[i].key, buf + offset, PRESENCE_KEY_LEN);
+        user->records[i].key[PRESENCE_KEY_LEN - 1] = '\0';
+        offset += PRESENCE_KEY_LEN;
+        memcpy(user->records[i].value, buf + offset, PRESENCE_VALUE_LEN);
+        user->records[i].value[PRESENCE_VALUE_LEN - 1] = '\0';
+        offset += PRESENCE_VALUE_LEN;
+        user->record_count++;
+    }
+    user->valid = true;
+    return true;
+}
+
+UserBeacon* discovery_get_users(DiscoveryService* ds, int* out_count) {
+    if (!ds || !out_count) return NULL;
+    *out_count = ds->user_count;
+    return (ds->user_count > 0) ? &ds->user_cache[0] : NULL;
 }
 
 DiscoveryService* discovery_create(uint16_t port) {
@@ -354,10 +496,34 @@ void discovery_broadcast_session(DiscoveryService* ds, const Session* session) {
     *(uint32_t*)(buf + offset) = htonl(session->registered_player_count); offset += 4;
     buf[offset++] = (uint8_t)session->state;
 
+    // bit0=join-in-progress, bits1-2=permission level (0/1/2), bit3=presence,
+    // bit4=sanctions, bit5=invites-allowed (see deserialize for why the full
+    // permission level must ride, not just a PublicAdvertised bit).
     uint8_t flags = 0;
     if (session->join_in_progress_allowed) flags |= 0x01;
-    if (session->permission_level == EOS_OSPF_PublicAdvertised) flags |= 0x02;
+    flags |= ((uint8_t)session->permission_level & 0x03) << 1;
+    if (session->presence_enabled) flags |= 0x08;
+    if (session->sanctions_enabled) flags |= 0x10;
+    if (session->invites_allowed) flags |= 0x20;
     buf[offset++] = flags;
+
+    // v2: presence join-info string (fixed 256 bytes)
+    memset(buf + offset, 0, PRESENCE_JOININFO_LEN);
+    strncpy((char*)(buf + offset), session->join_info, PRESENCE_JOININFO_LEN - 1);
+    offset += PRESENCE_JOININFO_LEN;
+
+    // v2: presence data records (count + fixed key/value pairs)
+    uint8_t prec_count = (session->presence_record_count > MAX_PRESENCE_RECORDS)
+        ? MAX_PRESENCE_RECORDS : (uint8_t)session->presence_record_count;
+    buf[offset++] = prec_count;
+    for (int i = 0; i < prec_count; i++) {
+        memset(buf + offset, 0, PRESENCE_KEY_LEN);
+        strncpy((char*)(buf + offset), session->presence_records[i].key, PRESENCE_KEY_LEN - 1);
+        offset += PRESENCE_KEY_LEN;
+        memset(buf + offset, 0, PRESENCE_VALUE_LEN);
+        strncpy((char*)(buf + offset), session->presence_records[i].value, PRESENCE_VALUE_LEN - 1);
+        offset += PRESENCE_VALUE_LEN;
+    }
 
     // Attributes — write the count we actually serialize, and never overflow buf.
     uint8_t* attr_count_field = buf + offset; offset += 2;
@@ -478,6 +644,13 @@ void discovery_poll(DiscoveryService* ds) {
             // Another instance is searching - set flag to trigger immediate broadcast
             ds->query_received = true;
             EOS_LOG_DEBUG("Received query from peer, will broadcast sessions immediately");
+        } else if (msg_type == MSG_USER_BEACON) {
+            UserBeacon user;
+            if (parse_user_beacon(ds->recv_buffer + 9, (int)(len - 9), &user)) {
+                char source_ip[16];
+                inet_ntop(AF_INET, &from.sin_addr, source_ip, sizeof(source_ip));
+                add_user_to_cache(ds, &user, source_ip);
+            }
         }
     }
 }

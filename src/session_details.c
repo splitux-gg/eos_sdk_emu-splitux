@@ -1,6 +1,7 @@
 #include "eos/eos_sessions.h"
 #include "eos/eos_sessions_types.h"
 #include "internal/sessions_internal.h"
+#include "internal/logging.h"
 #include <stdlib.h>
 #include <string.h>
 
@@ -23,7 +24,13 @@ static EOS_SessionDetails_Info* session_to_info(const Session* session) {
 
     // Allocate and copy session ID
     char* session_id = calloc(1, strlen(session->session_id) + 1);
-    char* host_address = calloc(1, strlen(session->host_address) + 1);
+    // EOS HostAddress must stay EMPTY for an EOS/P2P session: the game builds its
+    // connect string from the OWNER puid (EOS:<puid>:GameNetDriver). Our internal
+    // ip:port P2P endpoint lives in the Session struct's host_address (consumed by
+    // EOS_Sessions_JoinSession -> p2p_register_peer_address) and must NOT leak into
+    // the EOS_SessionDetails_Info the game reads — an ip:port here breaks the game's
+    // connect-string resolution (E007 right after JoinSession, before NetDriver).
+    char* host_address = calloc(1, 1);
     char* bucket_id = calloc(1, strlen(session->bucket_id) + 1);
 
     if (!session_id || !host_address || !bucket_id) {
@@ -36,7 +43,6 @@ static EOS_SessionDetails_Info* session_to_info(const Session* session) {
     }
 
     strcpy(session_id, session->session_id);
-    strcpy(host_address, session->host_address);
     strcpy(bucket_id, session->bucket_id);
 
     // Fill settings
@@ -88,6 +94,10 @@ EOS_DECLARE_FUNC(EOS_EResult) EOS_SessionDetails_CopyInfo(
         return EOS_LimitExceeded;
     }
 
+    EOS_LOG_INFO(">>> EOS_SessionDetails_CopyInfo: session='%s' owner='%s' perm=%d presence=%d attrs=%d",
+                 details->session.session_id, details->session.owner_id_string,
+                 (int)details->session.permission_level, (int)details->session.presence_enabled,
+                 details->session.attribute_count);
     *OutSessionInfo = info;
     return EOS_Success;
 }

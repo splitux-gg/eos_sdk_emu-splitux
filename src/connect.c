@@ -2,6 +2,7 @@
 #include "internal/auth_internal.h"
 #include "internal/logging.h"
 #include "internal/callbacks.h"
+#include "internal/sessions_internal.h"  // discovered_sessions for external-account mapping
 #include "eos/eos_connect.h"
 #include "eos/eos_connect_types.h"
 #include <stdlib.h>
@@ -19,15 +20,21 @@
 // Internal Helper Functions
 // ============================================================================
 
-static void connect_init_instance_id(ConnectState* state) {
-    // For now, generate a random instance ID
-    // In a full implementation, this would read from config
-    srand((unsigned int)time(NULL));
+// Deterministic identity helpers (defined in auth.c). Same string -> same id
+// across every process of an instance and across platforms.
+extern uint64_t eosdet_seed(const char* salt, const char* s);
+extern void eosdet_fill_hex(char* out, int len, uint64_t seed, const char* digits16);
 
-    for (int i = 0; i < 16; i++) {
-        state->instance_id[i] = "0123456789ABCDEF"[rand() % 16];
-    }
-    state->instance_id[16] = '\0';
+static void connect_init_instance_id(ConnectState* state) {
+    // Deterministic per-instance id (16 hex) derived from the stable
+    // EOSLAN_USERNAME, so EVERY process of this instance (bootstrap launcher +
+    // shipping game) mints the SAME ProductUserId. Was srand(time) -> a random
+    // id per process, so the two processes could mint different puids for one
+    // identity, and the host's session owner wouldn't match the friend the
+    // joiner resolved (UserKeyHandle:-1 / E011).
+    const char* user = getenv("EOSLAN_USERNAME");
+    if (!user || !user[0]) user = "LAN_Player";
+    eosdet_fill_hex(state->instance_id, 16, eosdet_seed("puid:", user), "0123456789ABCDEF");
 
     EOS_LOG_DEBUG("Generated instance ID: %s", state->instance_id);
 }
@@ -45,14 +52,18 @@ EOS_ProductUserId connect_generate_user_id(ConnectState* state, int user_index) 
 
     id->magic = PUID_MAGIC;
 
-    // Format: {instance_id:16hex}{user_index:4hex}{random:4hex}{padding:8hex}
-    uint16_t random_part = (uint16_t)(rand() & 0xFFFF);
-
+    // Deterministic, instance-stable ProductUserId: {instance_id:16hex}{zeros:16}.
+    // A single game instance is ONE identity, so every Connect_Login (boot login
+    // with no creds + the join-time token login) MUST resolve to the same puid,
+    // and it must match what we advertise in the LAN beacon and stamp as the
+    // session owner. Previously this mixed in user_index + a random part, so the
+    // two logins minted two different puids for one account -> the game's
+    // join-time user resolution couldn't match the identity (UserKeyHandle:-1)
+    // and aborted the EOS join with E011.
+    (void)user_index;
     snprintf(id->id_string, sizeof(id->id_string),
-             "%s%04X%04X00000000",
-             state->instance_id,
-             (uint16_t)user_index,
-             random_part);
+             "%s0000000000000000",
+             state->instance_id);
 
     EOS_LOG_DEBUG("Generated ProductUserId: %s", id->id_string);
     return (EOS_ProductUserId)id;
@@ -226,6 +237,14 @@ EOS_DECLARE_FUNC(void) EOS_Connect_Login(
             slot = i;
             break;
         }
+    }
+
+    // A game logs into Connect TWICE (boot + join-time token). Each call grabs a
+    // NEW slot here, so after two logins we report two logged-in users that share
+    // the deterministic puid.
+    {
+        int occupied = 0;
+        for (int i = 0; i < MAX_LOCAL_USERS; i++) if (state->users[i].in_use) occupied++;
     }
 
     EOS_Connect_LoginCallbackInfo info = {0};
@@ -560,20 +579,36 @@ EOS_DECLARE_FUNC(EOS_ProductUserId) EOS_ProductUserId_FromString(const char* Pro
         }
     }
 
-    EOS_ProductUserIdDetails* id = calloc(1, sizeof(EOS_ProductUserIdDetails));
-    if (!id) return NULL;
-
-    id->magic = PUID_MAGIC;
-    strncpy(id->id_string, ProductUserIdString, PRODUCT_USER_ID_LENGTH);
-    id->id_string[PRODUCT_USER_ID_LENGTH] = '\0';
-
-    // Uppercase for consistency
+    // Normalize (uppercase) into a local buffer first so interning compares the
+    // canonical form.
+    char norm[PRODUCT_USER_ID_LENGTH + 1];
     for (size_t i = 0; i < PRODUCT_USER_ID_LENGTH; i++) {
-        if (id->id_string[i] >= 'a' && id->id_string[i] <= 'f') {
-            id->id_string[i] -= 32;
+        char c = ProductUserIdString[i];
+        norm[i] = (c >= 'a' && c <= 'f') ? (char)(c - 32) : c;
+    }
+    norm[PRODUCT_USER_ID_LENGTH] = '\0';
+
+    // INTERN: the same puid string ALWAYS returns the same handle. Real EOS interns
+    // ProductUserIds and UE's account-id registry keys on the handle identity, so a
+    // fresh allocation per call meant a remote (host) puid — handed in via the
+    // session owner AND via GetExternalAccountMapping — appeared as several
+    // different handles, none of which UE could register. The host user then
+    // couldn't be formed during an Epic join (UserKeyHandle:-1 / E011). Static
+    // storage is safe: EOS exposes no puid-release API; interned ids live forever.
+    static EOS_ProductUserIdDetails g_interned_puids[256];
+    static int g_interned_puid_count = 0;
+    for (int i = 0; i < g_interned_puid_count; i++) {
+        if (strcmp(g_interned_puids[i].id_string, norm) == 0) {
+            return (EOS_ProductUserId)&g_interned_puids[i];
         }
     }
-
+    if (g_interned_puid_count >= (int)(sizeof(g_interned_puids) / sizeof(g_interned_puids[0]))) {
+        EOS_LOG_WARN("ProductUserId_FromString: intern table full, returning NULL");
+        return NULL;
+    }
+    EOS_ProductUserIdDetails* id = &g_interned_puids[g_interned_puid_count++];
+    id->magic = PUID_MAGIC;
+    memcpy(id->id_string, norm, PRODUCT_USER_ID_LENGTH + 1);
     return (EOS_ProductUserId)id;
 }
 
@@ -869,9 +904,24 @@ EOS_DECLARE_FUNC(EOS_ProductUserId) EOS_Connect_GetExternalAccountMapping(
     EOS_HConnect Handle,
     const EOS_Connect_GetExternalAccountMappingsOptions* Options
 ) {
-    EOS_LOG_INFO(">>> GetExternalAccountMapping called - AccountIdType=%d",
-                 Options ? (int)Options->AccountIdType : -1);
-    EOS_LOG_WARN("GetExternalAccountMapping not supported in LAN emulator");
+    if (!Options || !Options->TargetExternalUserId) return NULL;
+    EOS_LOG_INFO(">>> GetExternalAccountMapping: type=%d target='%s'",
+                 (int)Options->AccountIdType, Options->TargetExternalUserId);
+
+    // The game maps an external (Epic) account id -> ProductUserId to resolve a
+    // joinable host's (and its own) identity. Epic ids and ProductUserIds are
+    // DISTINCT, so we must return the user's REAL ProductUserId (matching the
+    // session owner), NOT a reshaped Epic id. The social bridge knows both: the
+    // local user's Connect id and each peer's puid (from its LAN beacon).
+    ConnectState* state = (ConnectState*)Handle;
+    if (state && state->platform) {
+        EOS_ProductUserId puid = social_bridge_resolve_puid(state->platform, Options->TargetExternalUserId);
+        if (puid) {
+            EOS_LOG_INFO(">>> GetExternalAccountMapping -> resolved real ProductUserId");
+            return puid;
+        }
+    }
+    EOS_LOG_WARN(">>> GetExternalAccountMapping -> no mapping found for '%s'", Options->TargetExternalUserId);
     return NULL;
 }
 
@@ -1005,21 +1055,39 @@ EOS_DECLARE_FUNC(EOS_EResult) EOS_Connect_GetProductUserIdMapping(
     EOS_LOG_INFO(">>> GetProductUserIdMapping called - AccountIdType=%d",
                  Options ? (int)Options->AccountIdType : -1);
 
-    // For Epic account type, return our EpicAccountId
-    if (Options && Options->AccountIdType == EOS_EAT_EPIC) {
-        extern AuthState g_auth_state;
-        if (g_auth_state.logged_in && OutBuffer && InOutBufferLength) {
-            int required = (int)strlen(g_auth_state.account_id.id_string) + 1;
-            if (*InOutBufferLength >= required) {
-                strcpy(OutBuffer, g_auth_state.account_id.id_string);
-                *InOutBufferLength = required;
-                EOS_LOG_INFO(">>> GetProductUserIdMapping returning EpicAccountId=%s",
-                             g_auth_state.account_id.id_string);
-                return EOS_Success;
-            }
+    ConnectState* state = (ConnectState*)Handle;
+    if (!Options || Options->AccountIdType != EOS_EAT_EPIC || !OutBuffer || !InOutBufferLength) {
+        return EOS_NotFound;
+    }
+
+    // Reverse mapping: given a ProductUserId, return ITS EpicAccountId. The game
+    // calls this on the HOST's puid (the session owner) to rebuild the host's
+    // FAccountId during a join. Returning the LOCAL user's epic for every puid
+    // mapped the host to the wrong identity -> the host user couldn't be formed
+    // -> EOS join died with UserKeyHandle:-1 / E011. Resolve the epic that
+    // actually belongs to TargetProductUserId via the social bridge.
+    char puid_str[33] = {0};
+    int32_t plen = (int32_t)sizeof(puid_str);
+    const char* epic = NULL;
+    if (Options->TargetProductUserId && state && state->platform &&
+        EOS_ProductUserId_ToString(Options->TargetProductUserId, puid_str, &plen) == EOS_Success) {
+        epic = social_bridge_resolve_epic_by_puid(state->platform, puid_str);
+    }
+    // No target given (rare) but logged in: assume the local user.
+    if (!epic && !Options->TargetProductUserId && g_auth_state.logged_in) {
+        epic = g_auth_state.account_id.id_string;
+    }
+
+    if (epic) {
+        int required = (int)strlen(epic) + 1;
+        if (*InOutBufferLength >= required) {
+            strcpy(OutBuffer, epic);
             *InOutBufferLength = required;
-            return EOS_LimitExceeded;
+            EOS_LOG_INFO(">>> GetProductUserIdMapping returning EpicAccountId=%s", epic);
+            return EOS_Success;
         }
+        *InOutBufferLength = required;
+        return EOS_LimitExceeded;
     }
     return EOS_NotFound;
 }
@@ -1029,16 +1097,11 @@ EOS_DECLARE_FUNC(EOS_EResult) EOS_Connect_GetProductUserIdMapping(
 // ============================================================================
 
 EOS_DECLARE_FUNC(void) EOS_ProductUserIdDetails_Release(EOS_ProductUserId UserId) {
-    // For user IDs created via FromString, we need to free them
-    // For user IDs returned by our Login/CreateUser, they're owned by ConnectState
-    // To be safe, we check if this is a standalone allocation
-    if (!UserId) return;
-
-    EOS_ProductUserIdDetails* details = (EOS_ProductUserIdDetails*)UserId;
-    if (details->magic == PUID_MAGIC) {
-        // This looks like a valid standalone ID, free it
-        free(details);
-    }
+    // No-op. ProductUserIds are now INTERNED (see EOS_ProductUserId_FromString)
+    // and live for the process lifetime, matching real EOS (which exposes no
+    // release for account ids). Freeing here would corrupt the static intern
+    // table / ConnectState slots. This isn't a real EOS export and is unused.
+    (void)UserId;
 }
 
 EOS_DECLARE_FUNC(void) EOS_Connect_ExternalAccountInfo_Release(EOS_Connect_ExternalAccountInfo* ExternalAccountInfo) {
