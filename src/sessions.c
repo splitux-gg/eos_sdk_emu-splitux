@@ -365,6 +365,7 @@ EOS_DECLARE_FUNC(void) EOS_Sessions_UpdateSession(
         info.SessionId = s->session_id;
 
         EOS_LOG_INFO("Session created: %s (ID: %s)", s->session_name, s->session_id);
+        eos_log_session_dump(s, "UpdateSession/new");
     } else {
         // Updating existing session
         Session* existing = find_local_session_by_name(state, mod->session.session_name);
@@ -380,6 +381,8 @@ EOS_DECLARE_FUNC(void) EOS_Sessions_UpdateSession(
         info.ResultCode = EOS_Success;
         info.SessionName = existing->session_name;
         info.SessionId = existing->session_id;
+
+        eos_log_session_dump(existing, "UpdateSession/update");
     }
 
 queue_callback:

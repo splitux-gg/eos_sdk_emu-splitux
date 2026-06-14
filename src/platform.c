@@ -120,6 +120,20 @@ EOS_DECLARE_FUNC(EOS_HPlatform) EOS_Platform_Create(const EOS_Platform_Options* 
         return NULL;
     }
 
+    // Log the EOS deployment/config the GAME passes so we can diff it across
+    // bench-vs-splitux and instance0-vs-instance1 (the "2 deployments /
+    // configuration passed" join hypothesis). ClientSecret is intentionally
+    // NOT logged; ClientId is needed to tell client configs apart.
+    EOS_LOG_INFO("[EOS_Platform_Create] ProductId='%s' SandboxId='%s' DeploymentId='%s' "
+                 "ClientId='%s' bIsServer=%d EncryptionKey=%s Flags=0x%llx",
+                 Options->ProductId ? Options->ProductId : "(null)",
+                 Options->SandboxId ? Options->SandboxId : "(null)",
+                 Options->DeploymentId ? Options->DeploymentId : "(null)",
+                 Options->ClientCredentials.ClientId ? Options->ClientCredentials.ClientId : "(null)",
+                 (int)Options->bIsServer,
+                 Options->EncryptionKey ? "set" : "(null)",
+                 (unsigned long long)Options->Flags);
+
     PlatformState* platform = calloc(1, sizeof(PlatformState));
     if (!platform) {
         return NULL;

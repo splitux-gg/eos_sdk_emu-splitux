@@ -4,6 +4,49 @@
 #include "internal/logging.h"
 #include <stdlib.h>
 #include <string.h>
+#include <inttypes.h>
+
+// Dump the full contents of a Session to the log: identity, owner, host
+// address, flags, and EVERY advertised attribute with its value. Used on both
+// the host (UpdateSession) and joiner (CopyInfo) sides so the bench-vs-splitux
+// and instance0-vs-instance1 session config can be diffed line-for-line.
+void eos_log_session_dump(const Session* s, const char* ctx) {
+    if (!s) { EOS_LOG_INFO("[session_dump:%s] (null session)", ctx); return; }
+    EOS_LOG_INFO("[session_dump:%s] id='%s' name='%s' owner='%s' host_addr='%s' "
+                 "bucket='%s' perm=%d presence=%d jip=%d invites=%d sanctions=%d "
+                 "max=%u state=%d attrs=%d join_info='%s'",
+                 ctx, s->session_id, s->session_name, s->owner_id_string,
+                 s->host_address, s->bucket_id,
+                 (int)s->permission_level, (int)s->presence_enabled,
+                 (int)s->join_in_progress_allowed, (int)s->invites_allowed,
+                 (int)s->sanctions_enabled, s->max_players, (int)s->state,
+                 s->attribute_count, s->join_info);
+    for (int i = 0; i < s->attribute_count && i < MAX_SESSION_ATTRIBUTES; i++) {
+        const SessionAttribute* a = &s->attributes[i];
+        switch (a->type) {
+            case EOS_AT_BOOLEAN:
+                EOS_LOG_INFO("[session_dump:%s]   attr[%d] '%s' = (bool) %d  adv=%d",
+                             ctx, i, a->key, (int)a->value.as_bool, (int)a->advertisement);
+                break;
+            case EOS_AT_INT64:
+                EOS_LOG_INFO("[session_dump:%s]   attr[%d] '%s' = (int64) %" PRId64 "  adv=%d",
+                             ctx, i, a->key, a->value.as_int64, (int)a->advertisement);
+                break;
+            case EOS_AT_DOUBLE:
+                EOS_LOG_INFO("[session_dump:%s]   attr[%d] '%s' = (double) %f  adv=%d",
+                             ctx, i, a->key, a->value.as_double, (int)a->advertisement);
+                break;
+            case EOS_AT_STRING:
+                EOS_LOG_INFO("[session_dump:%s]   attr[%d] '%s' = (string) '%s'  adv=%d",
+                             ctx, i, a->key, a->value.as_string, (int)a->advertisement);
+                break;
+            default:
+                EOS_LOG_INFO("[session_dump:%s]   attr[%d] '%s' = (type %d ?)  adv=%d",
+                             ctx, i, a->key, (int)a->type, (int)a->advertisement);
+                break;
+        }
+    }
+}
 
 // Helper function to convert internal Session to EOS_SessionDetails_Info
 static EOS_SessionDetails_Info* session_to_info(const Session* session) {
@@ -98,6 +141,7 @@ EOS_DECLARE_FUNC(EOS_EResult) EOS_SessionDetails_CopyInfo(
                  details->session.session_id, details->session.owner_id_string,
                  (int)details->session.permission_level, (int)details->session.presence_enabled,
                  details->session.attribute_count);
+    eos_log_session_dump(&details->session, "CopyInfo");
     *OutSessionInfo = info;
     return EOS_Success;
 }

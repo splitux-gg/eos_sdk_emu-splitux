@@ -211,6 +211,12 @@ Session* find_local_session_by_name(SessionsState* state, const char* name);
 Session* find_local_session_by_id(SessionsState* state, const char* id);
 void generate_session_id(char* buffer, size_t buffer_size);
 
+// Implemented in session_details.c — dump a session's identity, host address,
+// and every advertised attribute (key/type/value). Called on the host side
+// (UpdateSession) and joiner side (CopyInfo) to diff session config across
+// bench vs splitux and instance0 vs instance1.
+void eos_log_session_dump(const Session* s, const char* ctx);
+
 // Implemented in social_bridge.c — the local user's presence as published via
 // EOS_Presence_SetPresence. sessions.c stamps these onto the LAN announce so
 // the joiner's GetJoinInfo/CopyPresence return the host's real data.
