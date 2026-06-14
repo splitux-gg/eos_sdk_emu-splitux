@@ -35,6 +35,19 @@ void callback_queue_push(
 );
 
 /**
+ * Queue a callback to fire after a delay (ms), processed once its time is up.
+ * Models real EOS async latency so the game's lazy module loads (e.g.
+ * OnlineSubsystemEpic during a session join) finish before the callback lands.
+ */
+void callback_queue_push_delayed(
+    CallbackQueue* queue,
+    void* callback_fn,
+    const void* info,
+    size_t info_size,
+    uint32_t delay_ms
+);
+
+/**
  * Process all queued callbacks.
  * Called during EOS_Platform_Tick.
  *
