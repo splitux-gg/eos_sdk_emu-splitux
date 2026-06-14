@@ -601,18 +601,19 @@ EOS_DECLARE_FUNC(void) EOS_Sessions_JoinSession(
 
 queue_callback:
     if (CompletionDelegate && state && state->platform && state->platform->callbacks) {
-        // Fire the JoinSession result with a deliberate delay instead of next-tick.
-        // Real EOS takes hundreds of ms (network round-trip); UE relies on that
-        // latency to finish LAZILY loading OnlineSubsystemEpic (the OSS/NetDriver
-        // layer) before the join completes. If we fire immediately, the callback
-        // races that module load: on a fast/idle box the module wins and the game
-        // travels (Browse "EOS:host"); under load the callback wins, there's no
-        // NetDriver layer to hand off to, and Satisfactory silently aborts the
-        // join back to the main menu (no Browse). Delaying here makes the handoff
-        // deterministic regardless of host load. ~1.5s lazy-load observed under
-        // heavy splitux load, so give comfortable margin.
-        callback_queue_push_delayed(state->platform->callbacks, (void*)CompletionDelegate,
-                                    &info, sizeof(info), 2000);
+        // Fire the JoinSession result on the next tick (immediate), matching the
+        // proven-working bench (base commit d22094f). A previous attempt delayed
+        // this by 2s on the "module-load race" theory (OnlineSubsystemEpic loads
+        // lazily after the callback). That theory was DISPROVEN: the bench joiner
+        // logs the same "LoadSubsystemModule ... after StartupModule" warning and
+        // still travels — the warning is a benign ~10s periodic poll, not a
+        // one-time load that the callback can race. Worse, the 2s delay let the
+        // game's CommonSession join context go stale under splitux load, so the
+        // late EOS_Success arrived after the game had given up and it never issued
+        // the "Browse EOS:host" travel (E007). Immediate fire restores the bench
+        // behavior: callback -> EOS_P2P_SendPacket (ch 26) -> travel.
+        callback_queue_push(state->platform->callbacks, (void*)CompletionDelegate,
+                            &info, sizeof(info));
     }
 }
 
