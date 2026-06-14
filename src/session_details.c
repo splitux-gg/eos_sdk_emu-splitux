@@ -1,6 +1,7 @@
 #include "eos/eos_sessions.h"
 #include "eos/eos_sessions_types.h"
 #include "internal/sessions_internal.h"
+#include "internal/lan_discovery.h"
 #include "internal/logging.h"
 #include <stdlib.h>
 #include <string.h>
@@ -130,6 +131,23 @@ EOS_DECLARE_FUNC(EOS_EResult) EOS_SessionDetails_CopyInfo(
 
     if (!OutSessionInfo) {
         return EOS_InvalidParameters;
+    }
+
+    // Refresh from the live discovery cache before handing the session to the
+    // game. The handle's copy was snapshotted at search/Find time; if the host's
+    // session has since gained attributes (e.g. the host finished loading and
+    // added the gameplay attrs needed to migrate), use the freshest advertised
+    // copy. This fixes a joiner that searched a hair too early reading a stale,
+    // incomplete (e.g. 17-of-27 attr) session and failing the backend join.
+    if (details->sessions_state && details->sessions_state->discovery) {
+        const Session* fresh = discovery_find_cached_session(
+            details->sessions_state->discovery, details->session.session_id);
+        if (fresh && fresh->attribute_count > details->session.attribute_count) {
+            EOS_LOG_INFO(">>> CopyInfo: refreshing session '%s' from live cache (attrs %d -> %d)",
+                         details->session.session_id, details->session.attribute_count,
+                         fresh->attribute_count);
+            details->session = *fresh;
+        }
     }
 
     EOS_SessionDetails_Info* info = session_to_info(&details->session);
