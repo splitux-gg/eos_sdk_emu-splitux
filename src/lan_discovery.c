@@ -262,6 +262,14 @@ static void add_to_cache(DiscoveryService* ds, const Session* session, const cha
     // Check if session already exists in cache (update it)
     for (int i = 0; i < ds->cache_count; i++) {
         if (strcmp(ds->cache[i].session.session_id, session->session_id) == 0) {
+            // DIAG: log when the cached attribute count changes. If the joiner's
+            // cache never climbs to the host's full attr count, the bigger
+            // announce isn't landing (delivery), vs. landing-but-snapshotted-early.
+            if (ds->cache[i].session.attribute_count != session->attribute_count) {
+                EOS_LOG_INFO("[cache_update] session '%s' attrs %d -> %d (from %s)",
+                             session->session_id, ds->cache[i].session.attribute_count,
+                             session->attribute_count, source_ip);
+            }
             memcpy(&ds->cache[i].session, session, sizeof(Session));
             strncpy(ds->cache[i].source_ip, source_ip, sizeof(ds->cache[i].source_ip) - 1);
             ds->cache[i].received_at = get_time_ms();
@@ -535,6 +543,12 @@ void discovery_broadcast_session(DiscoveryService* ds, const Session* session) {
     }
     *(uint16_t*)attr_count_field = htons((uint16_t)attrs_written);
 
+    // DIAG: how big is the datagram we put on the wire, and how many attrs did
+    // it carry. A >MTU packet fragments on the LAN path; compare host-sent size
+    // here against [recv_announce] wire_len on the joiner to spot drops.
+    EOS_LOG_INFO("[bcast_announce] '%s' attrs=%d packet_len=%d (of %d)",
+                 session->session_name, attrs_written, offset, session->attribute_count);
+
     // Send broadcast
     struct sockaddr_in dest = {0};
     dest.sin_family = AF_INET;
@@ -630,15 +644,21 @@ void discovery_poll(DiscoveryService* ds) {
 
         if (msg_type == MSG_ANNOUNCE) {
             Session session;
+            char source_ip[16];
+            inet_ntop(AF_INET, &from.sin_addr, source_ip, sizeof(source_ip));
             if (parse_announcement(ds->recv_buffer + 9, len - 9, &session)) {
-                // Get source IP
-                char source_ip[16];
-                inet_ntop(AF_INET, &from.sin_addr, source_ip, sizeof(source_ip));
-
-                EOS_LOG_DEBUG("Received session announcement from %s: %s", source_ip, session.session_name);
+                // DIAG: surface the wire size + parsed attr count so we can tell
+                // whether a large (e.g. 27-attr) announce actually arrives intact
+                // on the joiner, or whether the bigger packet is truncated/lost.
+                EOS_LOG_INFO("[recv_announce] from %s: '%s' wire_len=%lld attrs=%d",
+                             source_ip, session.session_name, (long long)len,
+                             session.attribute_count);
 
                 // Add to cache
                 add_to_cache(ds, &session, source_ip);
+            } else {
+                EOS_LOG_INFO("[recv_announce] PARSE FAILED from %s: wire_len=%lld (packet dropped, cache keeps prior copy)",
+                             source_ip, (long long)len);
             }
         } else if (msg_type == MSG_QUERY) {
             // Another instance is searching - set flag to trigger immediate broadcast
