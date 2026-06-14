@@ -415,6 +415,7 @@ EOS_DECLARE_FUNC(EOS_EResult) EOS_SessionSearch_CopySearchResultByIndex(
 
     details->magic = 0x53445448;
     details->session = search->results[Options->SessionIndex];
+    details->sessions_state = search->sessions_state;  // for CopyInfo live refresh
 
     *OutSessionHandle = (EOS_HSessionDetails)details;
     return EOS_Success;

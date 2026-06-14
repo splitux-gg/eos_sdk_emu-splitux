@@ -156,7 +156,13 @@ typedef struct {
 // Session details handle
 typedef struct {
     uint32_t magic;  // 0x53445448 = "SDTH"
-    Session session;  // Copy of session data
+    Session session;  // Copy of session data (snapshot at creation time)
+    // Back-pointer to the owning sessions state so CopyInfo can re-pull the
+    // LATEST advertised session from the live discovery cache by session_id.
+    // Without this the handle is frozen at search/Find time; a joiner that
+    // searched while the host's session was still incomplete (e.g. host mid-load,
+    // 17 of 27 attrs) would otherwise read stale attributes and fail to migrate.
+    struct SessionsState* sessions_state;
 } SessionDetailsHandle;
 
 // Active session handle

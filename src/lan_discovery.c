@@ -665,6 +665,16 @@ Session* discovery_get_sessions(DiscoveryService* ds, int* out_count) {
     return &ds->cache[0].session;
 }
 
+const Session* discovery_find_cached_session(DiscoveryService* ds, const char* session_id) {
+    if (!ds || !session_id) return NULL;
+    for (int i = 0; i < ds->cache_count; i++) {
+        if (strcmp(ds->cache[i].session.session_id, session_id) == 0) {
+            return &ds->cache[i].session;
+        }
+    }
+    return NULL;
+}
+
 void discovery_clear_sessions(DiscoveryService* ds) {
     if (!ds) return;
     ds->cache_count = 0;
