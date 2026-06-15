@@ -598,6 +598,63 @@ EOS_DECLARE_FUNC(EOS_HLobby) EOS_Platform_GetLobbyInterface(EOS_HPlatform Handle
  * Core EOS_Lobby_* functions
  * ===========================================================================*/
 
+/* Stringify a lobby attribute into a presence data record (presence records are
+ * always key/value strings, lobby attributes are typed). */
+static void lobby_attr_to_record(const LobbyAttribute* la, PresenceRecord* out) {
+    char val[PRESENCE_VALUE_LEN];
+    switch (la->type) {
+        case EOS_AT_BOOLEAN: snprintf(val, sizeof(val), "%s", la->value.as_bool ? "true" : "false"); break;
+        case EOS_AT_INT64:   snprintf(val, sizeof(val), "%lld", (long long)la->value.as_int64); break;
+        case EOS_AT_DOUBLE:  snprintf(val, sizeof(val), "%g", la->value.as_double); break;
+        case EOS_AT_STRING:
+        default:             snprintf(val, sizeof(val), "%s", la->value.as_string); break;
+    }
+    strncpy(out->key, la->key, PRESENCE_KEY_LEN - 1);   out->key[PRESENCE_KEY_LEN - 1] = '\0';
+    strncpy(out->value, val, PRESENCE_VALUE_LEN - 1);   out->value[PRESENCE_VALUE_LEN - 1] = '\0';
+}
+
+/* Mirror a presence-enabled lobby into the local user's published EOS presence so
+ * a friend's EOS_Presence_CopyPresence/GetJoinInfo return a joinable record. Real
+ * EOS does this automatically for bPresenceEnabled lobbies; games like StarRupture
+ * rely on it and never call the Presence interface themselves (their host only
+ * creates a presence-enabled lobby with a CUSTOMJOININFO attribute). We expose the
+ * lobby id as the join-info (the joiner can EOS_Lobby_JoinLobbyById it) and surface
+ * the lobby attributes as presence data records. Records are capped at
+ * MAX_PRESENCE_RECORDS, so the join-critical keys are emitted first regardless of
+ * attribute order. social_bridge no-ops this if the game manages its own presence. */
+static void lobby_sync_local_presence(const Lobby* l) {
+    if (!l || !l->presence_enabled) return;
+
+    static const char* const priority[] = {
+        "CUSTOMJOININFO", "MapName", "NumPublicConnections", "NumPrivateConnections",
+    };
+    const int priority_count = (int)(sizeof(priority) / sizeof(priority[0]));
+
+    PresenceRecord recs[MAX_PRESENCE_RECORDS];
+    int n = 0;
+    bool used[MAX_LOBBY_ATTRIBUTES];
+    memset(used, 0, sizeof(used));
+
+    /* Pass 1: priority keys, in priority order. */
+    for (int k = 0; k < priority_count && n < MAX_PRESENCE_RECORDS; k++) {
+        for (int i = 0; i < l->attribute_count; i++) {
+            if (used[i]) continue;
+            if (strncmp(l->attributes[i].key, priority[k], MAX_LOBBY_ATTRIBUTE_KEY_LEN) != 0) continue;
+            lobby_attr_to_record(&l->attributes[i], &recs[n++]);
+            used[i] = true;
+            break;
+        }
+    }
+    /* Pass 2: remaining attributes, in order, until the cap. */
+    for (int i = 0; i < l->attribute_count && n < MAX_PRESENCE_RECORDS; i++) {
+        if (used[i]) continue;
+        lobby_attr_to_record(&l->attributes[i], &recs[n++]);
+        used[i] = true;
+    }
+
+    social_bridge_set_presence_from_lobby(l->lobby_id, recs, n);
+}
+
 EOS_DECLARE_FUNC(void) EOS_Lobby_CreateLobby(
     EOS_HLobby Handle,
     const EOS_Lobby_CreateLobbyOptions* Options,
@@ -691,6 +748,10 @@ EOS_DECLARE_FUNC(void) EOS_Lobby_CreateLobby(
     /* Start announcing immediately. */
     lobby_request_announce(state);
 
+    /* A presence-enabled lobby ties to the local user's presence (real EOS).
+     * Attributes are added later via UpdateLobby; this seeds the join-info now. */
+    lobby_sync_local_presence(l);
+
     info.ResultCode = EOS_Success;
     info.LobbyId = stable_lobby_id(l->lobby_id);
 
@@ -741,6 +802,10 @@ EOS_DECLARE_FUNC(void) EOS_Lobby_DestroyLobby(
         info.ResultCode = EOS_Lobby_NotOwner;
         goto queue_callback;
     }
+
+    /* This lobby drove our presence join-info; drop it so friends stop seeing us
+     * as joinable. */
+    if (l->presence_enabled) social_bridge_clear_lobby_presence();
 
     index = (int)(l - state->local_lobbies);
     if (index >= 0 && index < state->local_lobby_count) {
@@ -807,6 +872,10 @@ static EOS_EResult lobby_join_common(LobbyState* state, const Lobby* snapshot,
 
     state->local_lobby_count++;
     lobby_request_announce(state);
+
+    /* A joiner of a presence-enabled lobby also reflects it in its own presence
+     * (real EOS), so its friends can in turn join through it. */
+    lobby_sync_local_presence(l);
 
     lobby_fire_member_status(state, l->lobby_id, local_user, EOS_LMS_JOINED);
     return EOS_Success;
@@ -950,6 +1019,8 @@ EOS_DECLARE_FUNC(void) EOS_Lobby_LeaveLobby(
      * TargetUserId is the caller-owned LocalUserId, so neither dangles. */
     lobby_fire_member_status(state, Options->LobbyId, Options->LocalUserId, EOS_LMS_LEFT);
 
+    if (l->presence_enabled) social_bridge_clear_lobby_presence();
+
     index = (int)(l - state->local_lobbies);
     if (index >= 0 && index < state->local_lobby_count) {
         memmove(&state->local_lobbies[index],
@@ -1082,6 +1153,10 @@ EOS_DECLARE_FUNC(void) EOS_Lobby_UpdateLobby(
 
     info.ResultCode = EOS_Success;
     EOS_LOG_INFO("Lobby updated: %s", l->lobby_id);
+
+    /* Re-derive presence now that the lobby's attributes (CUSTOMJOININFO, MapName,
+     * conn counts) are committed, so friends' CopyPresence sees the join records. */
+    lobby_sync_local_presence(l);
 
     /* Notify listeners that the lobby (and possibly a member) changed. */
     lobby_fire_lobby_update(state, l->lobby_id);
