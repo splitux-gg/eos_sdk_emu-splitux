@@ -596,6 +596,11 @@ static void broadcast_own_beacon(PlatformState* p) {
     memcpy(ub.records, g_local_presence.records, sizeof(ub.records));
     ub.record_count = g_local_presence.record_count;
     ub.valid = true;
+    static int last_bcast_rc = -1;
+    if ((int)ub.record_count != last_bcast_rc) {
+        EOS_LOG_INFO(">>> beacon broadcast: join_info='%s', %d record(s)", ub.join_info, ub.record_count);
+        last_bcast_rc = (int)ub.record_count;
+    }
     discovery_broadcast_user(p->sessions->discovery, &ub);
 }
 

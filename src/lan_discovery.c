@@ -293,11 +293,16 @@ static void add_user_to_cache(DiscoveryService* ds, const UserBeacon* user, cons
     for (int i = 0; i < ds->user_count; i++) {
         if (strncmp(ds->user_cache[i].epic_id, user->epic_id, 32) == 0) {
             UserBeacon* slot = &ds->user_cache[i];
+            int prev_rc = slot->record_count;
             *slot = *user;
             strncpy(slot->source_ip, source_ip, sizeof(slot->source_ip) - 1);
             slot->source_ip[sizeof(slot->source_ip) - 1] = '\0';
             slot->last_seen = get_time_ms();
             slot->valid = true;
+            if (prev_rc != slot->record_count) {
+                EOS_LOG_INFO("user beacon '%s' updated: %d -> %d record(s)",
+                             slot->epic_id, prev_rc, slot->record_count);
+            }
             return;
         }
     }
