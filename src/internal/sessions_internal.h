@@ -27,7 +27,14 @@ typedef struct DiscoveryService DiscoveryService;
 // LAN announce so the joiner's EOS_Presence_GetJoinInfo/CopyPresence return
 // exactly what the host published (games parse their own join-info format).
 #define PRESENCE_JOININFO_LEN 256   // EOS_PRESENCE_DATA_MAX_VALUE_LENGTH + 1
-#define MAX_PRESENCE_RECORDS 8
+// 24 (was 8): a presence-enabled lobby host advertises ~14 attributes
+// (CUSTOMJOININFO, MapName, conn counts, GameMode, SESSIONTEMPLATENAME, OSSv1,
+// ALLOWEDPLATFORM, BUILDCL, MATCHTIMEOUT, BuildUniqueId, ...). UE copies every
+// presence record verbatim into FOnlineUserPresence.Status.Properties, and the
+// game's own join code reads those keys to decide joinable — so truncating to 8
+// dropped keys the game may gate on (platform/build/template). Beacon buffer is
+// 64KB; 24 records (~7.7KB) fits, and prec_count is a uint8_t (<=255).
+#define MAX_PRESENCE_RECORDS 24
 #define PRESENCE_KEY_LEN 65         // EOS_PRESENCE_DATA_MAX_KEY_LENGTH + 1
 #define PRESENCE_VALUE_LEN 256      // EOS_PRESENCE_DATA_MAX_VALUE_LENGTH + 1
 
