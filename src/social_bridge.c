@@ -41,6 +41,7 @@
 typedef struct {
     EOS_EpicAccountIdDetails epic;          // peer's EpicAccountId (real from beacon, else synthetic = puid)
     char puid[OWNER_ID_STRING_LEN];         // peer's ProductUserId string (dedupe key across sources)
+    char steam_id[24];                      // peer's Steam ID (from beacon); "" if the peer had none
     char session_id[SESSION_ID_LEN + 1];    // the peer's session id (join target; may be empty)
     char host_address[HOST_ADDRESS_LEN];    // "IP:port"
     char join_info[PRESENCE_JOININFO_LEN];  // host's REAL SetJoinInfo string (from announce/beacon)
@@ -270,6 +271,20 @@ EOS_DECLARE_FUNC(void) EOS_PresenceModification_Release(EOS_HPresenceModificatio
 static PeerFriend g_peers[MAX_DISCOVERED_SESSIONS];
 static int g_peer_count = 0;
 
+// Local user's Steam ID — EOSLAN_STEAM_ID, set per-instance by the bench from the
+// goldberg account_steamid. Lets Steam+EOS games map a Steam friend -> PUID. NULL
+// when unset (non-Steam games are unaffected). Cached: env is fixed for the process.
+static const char* local_steam_id_string(void) {
+    static const char* cached = NULL;
+    static int resolved = 0;
+    if (!resolved) {
+        const char* s = getenv("EOSLAN_STEAM_ID");
+        cached = (s && s[0]) ? s : NULL;
+        resolved = 1;
+    }
+    return cached;
+}
+
 // Local user's product id string (to exclude our own discovered session).
 static const char* local_product_id_string(PlatformState* p) {
     if (!p || !p->connect) return NULL;
@@ -321,6 +336,8 @@ static void refresh_peers(PlatformState* p) {
             if (!pf) break;
             strncpy(pf->puid, ub->puid, sizeof(pf->puid) - 1);
             pf->puid[sizeof(pf->puid) - 1] = '\0';
+            strncpy(pf->steam_id, ub->steam_id, sizeof(pf->steam_id) - 1);
+            pf->steam_id[sizeof(pf->steam_id) - 1] = '\0';
             strncpy(pf->display_name, ub->display_name, sizeof(pf->display_name) - 1);
             pf->display_name[sizeof(pf->display_name) - 1] = '\0';
             strncpy(pf->join_info, ub->join_info, sizeof(pf->join_info) - 1);
@@ -414,6 +431,35 @@ EOS_ProductUserId social_bridge_resolve_puid(PlatformState* p, const char* epic_
     return NULL;
 }
 
+// Map a STEAM external account id string -> the matching ProductUserId. Steam+EOS
+// games (e.g. StarRupture) list Steam *friends* and resolve each friend's Steam ID
+// -> PUID (EOS_Connect_GetExternalAccountMapping, type=STEAM) to attribute a found
+// lobby to a friend; without this the friends-browser shows "no sessions available"
+// even though the lobby search returned the host. The Steam ID is relayed in the
+// peer's LAN beacon (EOSLAN_STEAM_ID, set per-instance by the bench).
+EOS_ProductUserId social_bridge_resolve_puid_by_steam(PlatformState* p, const char* steam_id) {
+    if (!p || !steam_id || !steam_id[0]) return NULL;
+    // Local user (the game resolving its own Steam identity).
+    const char* self_steam = local_steam_id_string();
+    if (self_steam && strcmp(steam_id, self_steam) == 0) {
+        const char* puid = local_product_id_string(p);
+        if (puid) {
+            return EOS_ProductUserId_FromString(puid);
+        }
+    }
+    // Discovered peer (the host) — Steam id relayed in its beacon.
+    refresh_peers(p);
+    for (int i = 0; i < g_peer_count; i++) {
+        if (g_peers[i].valid &&
+            g_peers[i].steam_id[0] != '\0' &&
+            strcmp(g_peers[i].steam_id, steam_id) == 0 &&
+            g_peers[i].puid[0] != '\0') {
+            return EOS_ProductUserId_FromString(g_peers[i].puid);
+        }
+    }
+    return NULL;
+}
+
 // Reverse mapping: ProductUserId string -> EpicAccountId string. The game calls
 // EOS_Connect_GetProductUserIdMapping on a session OWNER's puid to rebuild that
 // user's Epic identity during a join; without this it can't form the host user
@@ -497,6 +543,8 @@ static void broadcast_own_beacon(PlatformState* p) {
     strncpy(ub.epic_id, g_auth_state.account_id.id_string, 32);
     const char* puid = local_product_id_string(p);
     if (puid) strncpy(ub.puid, puid, 32);
+    const char* steam_id = local_steam_id_string();
+    if (steam_id) strncpy(ub.steam_id, steam_id, sizeof(ub.steam_id) - 1);
     strncpy(ub.display_name, g_auth_state.display_name, sizeof(ub.display_name) - 1);
     strncpy(ub.join_info, g_local_presence.join_info, sizeof(ub.join_info) - 1);
     memcpy(ub.records, g_local_presence.records, sizeof(ub.records));

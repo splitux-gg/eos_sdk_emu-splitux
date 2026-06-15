@@ -46,6 +46,7 @@ typedef struct {
 typedef struct UserBeacon {
     char epic_id[33];                       // 32-hex EpicAccountId string
     char puid[33];                          // 32-hex ProductUserId string
+    char steam_id[24];                      // decimal Steam ID (EOSLAN_STEAM_ID), "" if unset
     char display_name[PEER_DISPLAY_NAME_LEN];
     char join_info[PRESENCE_JOININFO_LEN];
     PresenceRecord records[MAX_PRESENCE_RECORDS];
@@ -234,6 +235,10 @@ const PresenceRecord* social_bridge_local_records(int* out_count);
 // beacon as epic_id+puid). Used by EOS_Connect_GetExternalAccountMapping so the
 // game can resolve a joinable host's (and its own) identity during an EOS join.
 EOS_ProductUserId social_bridge_resolve_puid(PlatformState* platform, const char* epic_id);
+// Resolve a STEAM external account id -> ProductUserId (peer Steam ID relayed in
+// its LAN beacon). Used by EOS_Connect_GetExternalAccountMapping for type=STEAM so
+// Steam-friend-driven join UIs can attribute a discovered lobby to a friend.
+EOS_ProductUserId social_bridge_resolve_puid_by_steam(PlatformState* platform, const char* steam_id);
 
 // Reverse of the above: given a ProductUserId string, return the EpicAccountId
 // string it belongs to (the local user, or a discovered peer carried in its LAN

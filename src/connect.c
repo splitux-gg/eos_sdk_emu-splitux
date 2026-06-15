@@ -915,13 +915,22 @@ EOS_DECLARE_FUNC(EOS_ProductUserId) EOS_Connect_GetExternalAccountMapping(
     // local user's Connect id and each peer's puid (from its LAN beacon).
     ConnectState* state = (ConnectState*)Handle;
     if (state && state->platform) {
-        EOS_ProductUserId puid = social_bridge_resolve_puid(state->platform, Options->TargetExternalUserId);
+        EOS_ProductUserId puid;
+        if (Options->AccountIdType == EOS_EAT_STEAM) {
+            // Steam-friend-driven join UIs map a Steam friend's id -> PUID here.
+            puid = social_bridge_resolve_puid_by_steam(state->platform, Options->TargetExternalUserId);
+        } else {
+            // Default/Epic path: target is an EpicAccountId string.
+            puid = social_bridge_resolve_puid(state->platform, Options->TargetExternalUserId);
+        }
         if (puid) {
-            EOS_LOG_INFO(">>> GetExternalAccountMapping -> resolved real ProductUserId");
+            EOS_LOG_INFO(">>> GetExternalAccountMapping -> resolved real ProductUserId (type=%d)",
+                         (int)Options->AccountIdType);
             return puid;
         }
     }
-    EOS_LOG_WARN(">>> GetExternalAccountMapping -> no mapping found for '%s'", Options->TargetExternalUserId);
+    EOS_LOG_WARN(">>> GetExternalAccountMapping -> no mapping found for '%s' (type=%d)",
+                 Options->TargetExternalUserId, (int)Options->AccountIdType);
     return NULL;
 }
 
