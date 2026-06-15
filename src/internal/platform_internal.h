@@ -21,6 +21,15 @@ typedef struct PlatformState {
     EOS_ENetworkStatus network_status;
     EOS_EApplicationStatus app_status;
 
+    // Product identity the game passed to EOS_Platform_Create, deep-copied (the
+    // Options strings are caller-owned and may dangle after create returns). Used
+    // to report a peer's presence with the REAL product — a LAN clone runs the same
+    // product, and games filter friends whose presence ProductId/Version != their
+    // own, so a hardcoded/wrong ProductId hides the host from the Join Game list.
+    char product_id[64];
+    char product_name[128];
+    char product_version[64];
+
     // Subsystem handles
     ConnectState* connect;
     SessionsState* sessions;

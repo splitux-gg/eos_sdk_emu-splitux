@@ -787,7 +787,7 @@ EOS_DECLARE_FUNC(EOS_Bool) EOS_Presence_HasPresence(EOS_HPresence Handle, const 
 }
 
 EOS_DECLARE_FUNC(EOS_EResult) EOS_Presence_CopyPresence(EOS_HPresence Handle, const EOS_Presence_CopyPresenceOptions* Options, EOS_Presence_Info** OutPresence) {
-    (void)Handle;
+    PlatformState* plat = (PlatformState*)Handle;
     if (!OutPresence) return EOS_InvalidParameters;
     *OutPresence = NULL;
     EOS_EpicAccountId target = Options ? Options->TargetUserId : NULL;
@@ -809,11 +809,15 @@ EOS_DECLARE_FUNC(EOS_EResult) EOS_Presence_CopyPresence(EOS_HPresence Handle, co
     info->ApiVersion = EOS_PRESENCE_INFO_API_LATEST;
     info->Status = EOS_PS_Online;
     info->UserId = target;
-    info->ProductId = "Satisfactory";
-    info->ProductVersion = "1.0";
+    // Report the peer with OUR product identity — a LAN clone runs the same game,
+    // and the game filters friends whose presence ProductId/Version differs from
+    // its own (a hardcoded "Satisfactory" hid every other game's host). Falls back
+    // to a neutral string if the platform didn't carry product info.
+    info->ProductId = (plat && plat->product_id[0]) ? plat->product_id : "EOSLAN";
+    info->ProductVersion = (plat && plat->product_version[0]) ? plat->product_version : "1.0";
     info->Platform = "EOSLAN";
-    info->RichText = "Hosting a game";
-    info->ProductName = "Satisfactory";
+    info->RichText = "In Game";
+    info->ProductName = (plat && plat->product_name[0]) ? plat->product_name : "EOSLAN";
     info->IntegratedPlatform = "";
     // Relay the host's REAL presence data records (from the LAN announce).
     int n = (pf->record_count > MAX_PRESENCE_RECORDS) ? MAX_PRESENCE_RECORDS : pf->record_count;
@@ -827,7 +831,11 @@ EOS_DECLARE_FUNC(EOS_EResult) EOS_Presence_CopyPresence(EOS_HPresence Handle, co
     info->RecordsCount = n;
     info->Records = (n > 0) ? blk->recs : NULL;
     *OutPresence = info;
-    EOS_LOG_INFO(">>> EOS_Presence_CopyPresence: Online presence for peer, %d record(s)", n);
+    EOS_LOG_INFO(">>> EOS_Presence_CopyPresence: peer product='%s' v='%s', join_info='%s', %d record(s)",
+                 info->ProductId, info->ProductVersion, pf->join_info, n);
+    for (int i = 0; i < n; i++) {
+        EOS_LOG_INFO(">>>   presence record[%d]: '%s' = '%s'", i, blk->recs[i].Key, blk->recs[i].Value);
+    }
     return EOS_Success;
 }
 
