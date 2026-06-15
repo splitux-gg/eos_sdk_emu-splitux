@@ -81,6 +81,14 @@ typedef struct {
 
 static LocalPresence g_local_presence;
 
+// Set once the game publishes presence through the Presence interface directly
+// (SetJoinInfo/SetData -> SetPresence, e.g. Satisfactory). When set, we leave the
+// game's presence alone and do NOT auto-derive it from a presence-enabled lobby —
+// the game knows best. Games that never touch the Presence interface and rely on a
+// bPresenceEnabled lobby instead (e.g. StarRupture) leave this clear, so the lobby
+// auto-derive below populates their presence.
+static int g_game_set_presence = 0;
+
 // Accessors for sessions.c (stamps local presence onto the LAN announce).
 const char* social_bridge_local_join_info(void) {
     return g_local_presence.join_info;
@@ -248,6 +256,7 @@ EOS_DECLARE_FUNC(void) EOS_Presence_SetPresence(EOS_HPresence Handle, const EOS_
         for (int i = 0; i < mod->record_count; i++) {
             local_presence_set(mod->records[i].key, mod->records[i].value);
         }
+        g_game_set_presence = 1;  // game owns its presence; suppress lobby auto-derive
         info.ResultCode = EOS_Success;
         EOS_LOG_INFO(">>> EOS_Presence_SetPresence merged: join_info='%s', %d record(s) total",
                      g_local_presence.join_info, g_local_presence.record_count);
@@ -266,6 +275,43 @@ EOS_DECLARE_FUNC(void) EOS_PresenceModification_Release(EOS_HPresenceModificatio
         mod->magic = 0;
         free(mod);
     }
+}
+
+// Auto-derive the local user's published presence from a presence-enabled lobby.
+// Real EOS ties a bPresenceEnabled lobby to the user's presence so a friend's
+// EOS_Presence_CopyPresence / GetJoinInfo return a joinable record WITHOUT the
+// host ever calling the Presence interface. Games like StarRupture depend on this
+// (their host never touches EOS_Presence_*; it just creates a presence-enabled
+// lobby with a CUSTOMJOININFO attribute). Without it the host's user beacon
+// carries empty presence -> the joiner's CopyPresence returns 0 records -> the
+// friends "Join Game" browser shows "No sessions available".
+// Called by lobby.c on create/update/join of a presence-enabled lobby. No-op if
+// the game manages presence itself (g_game_set_presence) so we never clobber a
+// game that uses the Presence interface directly (e.g. Satisfactory).
+void social_bridge_set_presence_from_lobby(const char* join_info,
+                                           const PresenceRecord* records, int record_count) {
+    if (g_game_set_presence) return;
+    if (join_info) {
+        strncpy(g_local_presence.join_info, join_info, sizeof(g_local_presence.join_info) - 1);
+        g_local_presence.join_info[sizeof(g_local_presence.join_info) - 1] = '\0';
+    }
+    int n = record_count;
+    if (n < 0) n = 0;
+    if (n > MAX_PRESENCE_RECORDS) n = MAX_PRESENCE_RECORDS;
+    for (int i = 0; i < n; i++) g_local_presence.records[i] = records[i];
+    g_local_presence.record_count = n;
+    EOS_LOG_INFO(">>> social_bridge: presence auto-derived from presence-enabled lobby: join_info='%s', %d record(s)",
+                 g_local_presence.join_info, g_local_presence.record_count);
+}
+
+// Clear lobby-derived presence when the local user leaves/destroys its
+// presence-enabled lobby. No-op if the game owns its presence.
+void social_bridge_clear_lobby_presence(void) {
+    if (g_game_set_presence) return;
+    if (g_local_presence.join_info[0] == '\0' && g_local_presence.record_count == 0) return;
+    g_local_presence.join_info[0] = '\0';
+    g_local_presence.record_count = 0;
+    EOS_LOG_INFO(">>> social_bridge: cleared lobby-derived presence");
 }
 
 static PeerFriend g_peers[MAX_DISCOVERED_SESSIONS];

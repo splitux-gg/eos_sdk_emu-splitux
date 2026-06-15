@@ -224,6 +224,15 @@ void generate_session_id(char* buffer, size_t buffer_size);
 const char* social_bridge_local_join_info(void);
 const PresenceRecord* social_bridge_local_records(int* out_count);
 
+// Auto-derive the local user's published presence from a presence-enabled lobby
+// (real EOS behavior). Called by lobby.c on create/update/join of a
+// bPresenceEnabled lobby; no-op if the game sets presence itself. Lets games that
+// never touch the Presence interface (e.g. StarRupture) still expose a joinable
+// presence record + join-info to friends' CopyPresence/GetJoinInfo.
+void social_bridge_set_presence_from_lobby(const char* join_info,
+                                           const PresenceRecord* records, int record_count);
+void social_bridge_clear_lobby_presence(void);
+
 // Resolve an external (Epic) account id string -> the matching ProductUserId:
 // the local user's own Connect id, or a discovered peer's (carried in its LAN
 // beacon as epic_id+puid). Used by EOS_Connect_GetExternalAccountMapping so the
