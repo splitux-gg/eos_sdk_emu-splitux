@@ -42,10 +42,16 @@ EOS_DECLARE_FUNC(EOS_EpicAccountId) EOS_EpicAccountId_FromString(const char* Str
     EOS_LOG_INFO("EpicAccountId_FromString('%s')", String ? String : "NULL");
     extern AuthState g_auth_state;
 
-    // Garbage/short input: keep the old back-compat behavior (hand back the local
-    // user) so degenerate callers don't crash.
+    // A well-formed EpicAccountId is exactly EPIC_ACCOUNT_ID_LENGTH hex chars. Real
+    // EOS returns an INVALID id for anything else, and we MUST too: Steam+EOS games
+    // bridging external accounts call FromString on a *Steam ID* string (e.g.
+    // "76561198000000001", 17 chars). Handing back the LOCAL user there associates a
+    // remote host's puid with the joiner's epic, violating UE's one-puid<->one-epic
+    // registry invariant (FUniqueNetIdEOSRegistry asserts InEpicAccountId ==
+    // FoundEpicAccountId -> hard crash). NULL makes EpicAccountId_IsValid() return
+    // false, so the caller treats the id as absent (PUID-only) instead of mismatched.
     if (!String || strlen(String) != EPIC_ACCOUNT_ID_LENGTH) {
-        return g_auth_state.logged_in ? (EOS_EpicAccountId)&g_auth_state.account_id : NULL;
+        return NULL;
     }
 
     // The local user's own id -> the canonical local handle (stable pointer).
