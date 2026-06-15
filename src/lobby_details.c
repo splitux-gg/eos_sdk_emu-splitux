@@ -162,9 +162,15 @@ EOS_DECLARE_FUNC(EOS_EResult) EOS_LobbyDetails_CopyInfo(
 
     EOS_LobbyDetails_Info* info = lobby_to_info(&details->lobby);
     if (!info) {
+        EOS_LOG_INFO("LobbyDetails_CopyInfo: lobby_to_info failed for '%s' -> EOS_LimitExceeded",
+                     details->lobby.lobby_id);
         return EOS_LimitExceeded;
     }
 
+    EOS_LOG_INFO("LobbyDetails_CopyInfo: lobby '%s' owner '%s' members=%d/%u attrs=%d",
+                 details->lobby.lobby_id, details->lobby.owner_id_string,
+                 details->lobby.member_count, details->lobby.max_members,
+                 details->lobby.attribute_count);
     *OutLobbyDetailsInfo = info;
     return EOS_Success;
 }

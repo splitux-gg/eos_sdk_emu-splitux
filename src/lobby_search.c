@@ -414,9 +414,11 @@ EOS_DECLARE_FUNC(uint32_t) EOS_LobbySearch_GetSearchResultCount(
     }
 
     if (!search->search_complete) {
+        EOS_LOG_INFO("LobbySearch_GetSearchResultCount: search not complete yet -> 0");
         return 0;
     }
 
+    EOS_LOG_INFO("LobbySearch_GetSearchResultCount -> %d result(s)", search->result_count);
     return (uint32_t)search->result_count;
 }
 
@@ -444,6 +446,8 @@ EOS_DECLARE_FUNC(EOS_EResult) EOS_LobbySearch_CopySearchResultByIndex(
     }
 
     if (Options->LobbyIndex >= (uint32_t)search->result_count) {
+        EOS_LOG_INFO("LobbySearch_CopySearchResultByIndex: index %u >= result_count %d -> EOS_NotFound",
+                     Options->LobbyIndex, search->result_count);
         return EOS_NotFound;
     }
 
@@ -457,6 +461,9 @@ EOS_DECLARE_FUNC(EOS_EResult) EOS_LobbySearch_CopySearchResultByIndex(
     details->lobby = search->results[Options->LobbyIndex];  // flat struct, deep copy
     details->local_user = NULL;  // search results are not tied to a local member
 
+    EOS_LOG_INFO("LobbySearch_CopySearchResultByIndex: index %u -> lobby '%s' (owner '%s', %d attrs)",
+                 Options->LobbyIndex, details->lobby.lobby_id, details->lobby.owner_id_string,
+                 details->lobby.attribute_count);
     *OutLobbyDetailsHandle = (EOS_HLobbyDetails)details;
     return EOS_Success;
 }

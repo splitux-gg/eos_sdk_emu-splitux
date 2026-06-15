@@ -826,15 +826,22 @@ EOS_DECLARE_FUNC(void) EOS_Lobby_JoinLobby(
     info.ResultCode = EOS_InvalidParameters;
     info.ClientData = ClientData;
 
+    EOS_LOG_INFO("EOS_Lobby_JoinLobby: ENTER (details=%p presence=%d)",
+                 (void*)(Options ? Options->LobbyDetailsHandle : NULL),
+                 Options ? (int)Options->bPresenceEnabled : -1);
+
     if (!state || state->magic != LOBBY_STATE_MAGIC) {
+        EOS_LOG_INFO("EOS_Lobby_JoinLobby: bad state handle -> EOS_InvalidParameters");
         goto queue_callback;
     }
     if (!Options || !Options->LobbyDetailsHandle || !Options->LocalUserId) {
+        EOS_LOG_INFO("EOS_Lobby_JoinLobby: missing Options/DetailsHandle/LocalUserId -> EOS_InvalidParameters");
         goto queue_callback;
     }
 
     details = (LobbyDetailsHandle*)Options->LobbyDetailsHandle;
     if (!details || details->magic != LOBBY_DETAILS_MAGIC) {
+        EOS_LOG_INFO("EOS_Lobby_JoinLobby: bad LobbyDetails handle -> EOS_InvalidParameters");
         goto queue_callback;
     }
 
@@ -844,6 +851,9 @@ EOS_DECLARE_FUNC(void) EOS_Lobby_JoinLobby(
 
     if (info.ResultCode == EOS_Success) {
         EOS_LOG_INFO("Joined lobby: %s", details->lobby.lobby_id);
+    } else {
+        EOS_LOG_INFO("EOS_Lobby_JoinLobby: lobby_join_common('%s') -> result code %d",
+                     details->lobby.lobby_id, (int)info.ResultCode);
     }
 
 queue_callback:
