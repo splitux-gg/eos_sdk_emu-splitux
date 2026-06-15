@@ -638,7 +638,18 @@ void social_bridge_tick(PlatformState* p) {
         // actually has a joinable session; the single fetch then runs against
         // complete data (session + presence + display name) in a clean
         // post-login window, succeeds, and the host resolves as an online user.
-        if (is_new && pf->session_id[0] == '\0') continue;
+        //
+        // "Joinable" can be a discovered EOS session (session_id) OR a
+        // presence-enabled lobby, whose join data arrives as presence records +
+        // join-info on the host's user beacon (no session_id — the lobby is not a
+        // session). EOSPlus+Steam titles like StarRupture are purely the latter:
+        // their friends "Join Game" reads the host's presence, and the game does
+        // its one-shot fetch off the OnPresenceChanged notification we fire here.
+        // Gate on record_count (the lobby presence is fully populated once its
+        // attributes have propagated) so the fetch still runs against complete
+        // data; without this the hold never releases for lobby hosts and the
+        // browser shows "No sessions available" forever.
+        if (is_new && pf->session_id[0] == '\0' && pf->record_count == 0) continue;
 
         uint32_t fp = presence_fingerprint(pf);
         if (!is_new && np->presence_fp == fp) continue;  // nothing changed
