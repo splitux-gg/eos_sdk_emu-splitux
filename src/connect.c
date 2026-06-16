@@ -924,8 +924,9 @@ EOS_DECLARE_FUNC(EOS_ProductUserId) EOS_Connect_GetExternalAccountMapping(
             puid = social_bridge_resolve_puid(state->platform, Options->TargetExternalUserId);
         }
         if (puid) {
-            EOS_LOG_INFO(">>> GetExternalAccountMapping -> resolved real ProductUserId (type=%d)",
-                         (int)Options->AccountIdType);
+            EOS_LOG_INFO(">>> GetExternalAccountMapping(type=%d, '%s') -> puid '%s'",
+                         (int)Options->AccountIdType, Options->TargetExternalUserId,
+                         ((EOS_ProductUserIdDetails*)puid)->id_string);
             return puid;
         }
     }
