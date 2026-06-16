@@ -43,6 +43,13 @@ void discovery_poll(DiscoveryService* ds);
 Session* discovery_get_sessions(DiscoveryService* ds, int* out_count);
 
 /**
+ * Find a single discovered session by its session_id in the live cache, or NULL.
+ * Used to re-pull the freshest advertised attributes for a session the game is
+ * about to read/join, instead of a stale search-time snapshot.
+ */
+const Session* discovery_find_cached_session(DiscoveryService* ds, const char* session_id);
+
+/**
  * Clear all discovered sessions.
  */
 void discovery_clear(DiscoveryService* ds);

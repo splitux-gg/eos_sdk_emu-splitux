@@ -325,18 +325,33 @@ EOS_DECLARE_FUNC(void) EOS_SessionSearch_Find(
             }
         }
 
-        // Check target user ID filter
+        // Check target user ID filter (session OWNER or a registered player).
+        // Wire-discovered sessions carry only the owner over the LAN broadcast
+        // (registered_players[] is empty until joined, and owner_id is a process-local
+        // pointer — only owner_id_string survives the wire). The friends "Join Game"
+        // browser does a per-friend Sessions search keyed on the friend's puid, so we
+        // MUST match the owner by string or it returns 0 even though the friend is
+        // hosting (this is what left StarRupture's friends browser empty).
         if (search->target_user_id != NULL) {
             bool user_found = false;
-            for (int j = 0; j < s->registered_player_count; j++) {
+            char tgt[64];
+            int32_t tlen = (int32_t)sizeof(tgt);
+            if (EOS_ProductUserId_ToString(search->target_user_id, tgt, &tlen) == EOS_Success &&
+                s->owner_id_string[0] != '\0' && strcmp(s->owner_id_string, tgt) == 0) {
+                user_found = true;
+            }
+            for (int j = 0; !user_found && j < s->registered_player_count; j++) {
                 if (s->registered_players[j] == search->target_user_id) {
                     user_found = true;
-                    break;
                 }
             }
             if (!user_found) {
+                EOS_LOG_INFO("SessionSearch_Find: REJECT '%s' target_user not owner/player",
+                             s->session_id);
                 continue;
             }
+            EOS_LOG_INFO("SessionSearch_Find: ACCEPT '%s' (owner match for target user)",
+                         s->session_id);
         }
 
         // Check parameter filters
@@ -415,6 +430,7 @@ EOS_DECLARE_FUNC(EOS_EResult) EOS_SessionSearch_CopySearchResultByIndex(
 
     details->magic = 0x53445448;
     details->session = search->results[Options->SessionIndex];
+    details->sessions_state = search->sessions_state;  // for CopyInfo live refresh
 
     *OutSessionHandle = (EOS_HSessionDetails)details;
     return EOS_Success;

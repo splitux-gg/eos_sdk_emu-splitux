@@ -365,6 +365,10 @@ EOS_DECLARE_FUNC(void) EOS_Sessions_UpdateSession(
         info.SessionId = s->session_id;
 
         EOS_LOG_INFO("Session created: %s (ID: %s)", s->session_name, s->session_id);
+
+        // Push the new session to the LAN immediately instead of waiting for the
+        // next ~2s announce tick, so a joiner searching right now sees it.
+        if (state->discovery) discovery_broadcast_session(state->discovery, s);
     } else {
         // Updating existing session
         Session* existing = find_local_session_by_name(state, mod->session.session_name);
@@ -380,6 +384,13 @@ EOS_DECLARE_FUNC(void) EOS_Sessions_UpdateSession(
         info.ResultCode = EOS_Success;
         info.SessionName = existing->session_name;
         info.SessionId = existing->session_id;
+
+        // Broadcast the UPDATED session immediately. This is the core fix for the
+        // splitux join race: when the host finishes loading and adds its gameplay
+        // attributes (17 -> 27), the joiner's discovery cache is refreshed within
+        // milliseconds instead of up to ~2s later, so a joiner reading the session
+        // right then gets the complete copy and can migrate.
+        if (state->discovery) discovery_broadcast_session(state->discovery, existing);
     }
 
 queue_callback:
@@ -933,6 +944,7 @@ static EOS_EResult copy_details_by_session_id(SessionsState* state, const char* 
     }
     details->magic = 0x53445448;
     details->session = *found;
+    details->sessions_state = state;  // for CopyInfo live refresh
     *OutSessionHandle = (EOS_HSessionDetails)details;
     return EOS_Success;
 }
@@ -983,6 +995,7 @@ EOS_DECLARE_FUNC(EOS_EResult) EOS_Sessions_CopySessionHandleForPresence(
             if (!details) return EOS_LimitExceeded;
             details->magic = 0x53445448;
             details->session = *s;
+            details->sessions_state = state;  // for CopyInfo live refresh
             *OutSessionHandle = (EOS_HSessionDetails)details;
             EOS_LOG_INFO(">>> EOS_Sessions_CopySessionHandleForPresence -> '%s'", s->session_name);
             return EOS_Success;

@@ -354,17 +354,20 @@ EOS_DECLARE_FUNC(void) EOS_LobbySearch_Find(
             }
         }
 
-        // Check target user ID filter (user must be a registered member)
+        // Check target user ID filter (user must be the owner or a registered member).
+        // Wire-discovered lobbies carry only the owner over the LAN broadcast — members[]
+        // is empty until the lobby is joined — so a search-by-user for the host (the common
+        // "join by presence / find friend's game" path, e.g. StarRupture's join menu) must
+        // match against the owner, not just the member roster, or it wrongly returns 0.
         if (search->target_user_id != NULL) {
-            bool user_found = false;
-            for (int j = 0; j < l->member_count; j++) {
+            bool user_found = (l->owner_id != NULL && l->owner_id == search->target_user_id);
+            for (int j = 0; !user_found && j < l->member_count; j++) {
                 if (l->members[j].valid && l->members[j].member_id == search->target_user_id) {
                     user_found = true;
-                    break;
                 }
             }
             if (!user_found) {
-                EOS_LOG_INFO("LobbySearch_Find:     REJECT target_user_id not found among %d members (members[] empty on wire-discovered lobbies)", l->member_count);
+                EOS_LOG_INFO("LobbySearch_Find:     REJECT target_user_id not owner and not among %d member(s)", l->member_count);
                 continue;
             }
         }

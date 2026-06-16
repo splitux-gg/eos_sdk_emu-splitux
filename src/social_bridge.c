@@ -41,6 +41,7 @@
 typedef struct {
     EOS_EpicAccountIdDetails epic;          // peer's EpicAccountId (real from beacon, else synthetic = puid)
     char puid[OWNER_ID_STRING_LEN];         // peer's ProductUserId string (dedupe key across sources)
+    char steam_id[24];                      // peer's Steam ID (from beacon); "" if the peer had none
     char session_id[SESSION_ID_LEN + 1];    // the peer's session id (join target; may be empty)
     char host_address[HOST_ADDRESS_LEN];    // "IP:port"
     char join_info[PRESENCE_JOININFO_LEN];  // host's REAL SetJoinInfo string (from announce/beacon)
@@ -79,6 +80,14 @@ typedef struct {
 } LocalPresence;
 
 static LocalPresence g_local_presence;
+
+// Set once the game publishes presence through the Presence interface directly
+// (SetJoinInfo/SetData -> SetPresence, e.g. Satisfactory). When set, we leave the
+// game's presence alone and do NOT auto-derive it from a presence-enabled lobby —
+// the game knows best. Games that never touch the Presence interface and rely on a
+// bPresenceEnabled lobby instead (e.g. StarRupture) leave this clear, so the lobby
+// auto-derive below populates their presence.
+static int g_game_set_presence = 0;
 
 // Accessors for sessions.c (stamps local presence onto the LAN announce).
 const char* social_bridge_local_join_info(void) {
@@ -247,6 +256,7 @@ EOS_DECLARE_FUNC(void) EOS_Presence_SetPresence(EOS_HPresence Handle, const EOS_
         for (int i = 0; i < mod->record_count; i++) {
             local_presence_set(mod->records[i].key, mod->records[i].value);
         }
+        g_game_set_presence = 1;  // game owns its presence; suppress lobby auto-derive
         info.ResultCode = EOS_Success;
         EOS_LOG_INFO(">>> EOS_Presence_SetPresence merged: join_info='%s', %d record(s) total",
                      g_local_presence.join_info, g_local_presence.record_count);
@@ -267,8 +277,59 @@ EOS_DECLARE_FUNC(void) EOS_PresenceModification_Release(EOS_HPresenceModificatio
     }
 }
 
+// Auto-derive the local user's published presence from a presence-enabled lobby.
+// Real EOS ties a bPresenceEnabled lobby to the user's presence so a friend's
+// EOS_Presence_CopyPresence / GetJoinInfo return a joinable record WITHOUT the
+// host ever calling the Presence interface. Games like StarRupture depend on this
+// (their host never touches EOS_Presence_*; it just creates a presence-enabled
+// lobby with a CUSTOMJOININFO attribute). Without it the host's user beacon
+// carries empty presence -> the joiner's CopyPresence returns 0 records -> the
+// friends "Join Game" browser shows "No sessions available".
+// Called by lobby.c on create/update/join of a presence-enabled lobby. No-op if
+// the game manages presence itself (g_game_set_presence) so we never clobber a
+// game that uses the Presence interface directly (e.g. Satisfactory).
+void social_bridge_set_presence_from_lobby(const char* join_info,
+                                           const PresenceRecord* records, int record_count) {
+    if (g_game_set_presence) return;
+    if (join_info) {
+        strncpy(g_local_presence.join_info, join_info, sizeof(g_local_presence.join_info) - 1);
+        g_local_presence.join_info[sizeof(g_local_presence.join_info) - 1] = '\0';
+    }
+    int n = record_count;
+    if (n < 0) n = 0;
+    if (n > MAX_PRESENCE_RECORDS) n = MAX_PRESENCE_RECORDS;
+    for (int i = 0; i < n; i++) g_local_presence.records[i] = records[i];
+    g_local_presence.record_count = n;
+    EOS_LOG_INFO(">>> social_bridge: presence auto-derived from presence-enabled lobby: join_info='%s', %d record(s)",
+                 g_local_presence.join_info, g_local_presence.record_count);
+}
+
+// Clear lobby-derived presence when the local user leaves/destroys its
+// presence-enabled lobby. No-op if the game owns its presence.
+void social_bridge_clear_lobby_presence(void) {
+    if (g_game_set_presence) return;
+    if (g_local_presence.join_info[0] == '\0' && g_local_presence.record_count == 0) return;
+    g_local_presence.join_info[0] = '\0';
+    g_local_presence.record_count = 0;
+    EOS_LOG_INFO(">>> social_bridge: cleared lobby-derived presence");
+}
+
 static PeerFriend g_peers[MAX_DISCOVERED_SESSIONS];
 static int g_peer_count = 0;
+
+// Local user's Steam ID — EOSLAN_STEAM_ID, set per-instance by the bench from the
+// goldberg account_steamid. Lets Steam+EOS games map a Steam friend -> PUID. NULL
+// when unset (non-Steam games are unaffected). Cached: env is fixed for the process.
+static const char* local_steam_id_string(void) {
+    static const char* cached = NULL;
+    static int resolved = 0;
+    if (!resolved) {
+        const char* s = getenv("EOSLAN_STEAM_ID");
+        cached = (s && s[0]) ? s : NULL;
+        resolved = 1;
+    }
+    return cached;
+}
 
 // Local user's product id string (to exclude our own discovered session).
 static const char* local_product_id_string(PlatformState* p) {
@@ -321,6 +382,8 @@ static void refresh_peers(PlatformState* p) {
             if (!pf) break;
             strncpy(pf->puid, ub->puid, sizeof(pf->puid) - 1);
             pf->puid[sizeof(pf->puid) - 1] = '\0';
+            strncpy(pf->steam_id, ub->steam_id, sizeof(pf->steam_id) - 1);
+            pf->steam_id[sizeof(pf->steam_id) - 1] = '\0';
             strncpy(pf->display_name, ub->display_name, sizeof(pf->display_name) - 1);
             pf->display_name[sizeof(pf->display_name) - 1] = '\0';
             strncpy(pf->join_info, ub->join_info, sizeof(pf->join_info) - 1);
@@ -414,6 +477,35 @@ EOS_ProductUserId social_bridge_resolve_puid(PlatformState* p, const char* epic_
     return NULL;
 }
 
+// Map a STEAM external account id string -> the matching ProductUserId. Steam+EOS
+// games (e.g. StarRupture) list Steam *friends* and resolve each friend's Steam ID
+// -> PUID (EOS_Connect_GetExternalAccountMapping, type=STEAM) to attribute a found
+// lobby to a friend; without this the friends-browser shows "no sessions available"
+// even though the lobby search returned the host. The Steam ID is relayed in the
+// peer's LAN beacon (EOSLAN_STEAM_ID, set per-instance by the bench).
+EOS_ProductUserId social_bridge_resolve_puid_by_steam(PlatformState* p, const char* steam_id) {
+    if (!p || !steam_id || !steam_id[0]) return NULL;
+    // Local user (the game resolving its own Steam identity).
+    const char* self_steam = local_steam_id_string();
+    if (self_steam && strcmp(steam_id, self_steam) == 0) {
+        const char* puid = local_product_id_string(p);
+        if (puid) {
+            return EOS_ProductUserId_FromString(puid);
+        }
+    }
+    // Discovered peer (the host) — Steam id relayed in its beacon.
+    refresh_peers(p);
+    for (int i = 0; i < g_peer_count; i++) {
+        if (g_peers[i].valid &&
+            g_peers[i].steam_id[0] != '\0' &&
+            strcmp(g_peers[i].steam_id, steam_id) == 0 &&
+            g_peers[i].puid[0] != '\0') {
+            return EOS_ProductUserId_FromString(g_peers[i].puid);
+        }
+    }
+    return NULL;
+}
+
 // Reverse mapping: ProductUserId string -> EpicAccountId string. The game calls
 // EOS_Connect_GetProductUserIdMapping on a session OWNER's puid to rebuild that
 // user's Epic identity during a join; without this it can't form the host user
@@ -431,6 +523,28 @@ const char* social_bridge_resolve_epic_by_puid(PlatformState* p, const char* pui
     for (int i = 0; i < g_peer_count; i++) {
         if (g_peers[i].valid && g_peers[i].puid[0] &&
             strncmp(g_peers[i].puid, puid, PRODUCT_USER_ID_LENGTH) == 0 &&
+            g_peers[i].epic.id_string[0]) {
+            return g_peers[i].epic.id_string;
+        }
+    }
+    return NULL;
+}
+
+// Resolve a STEAM external id -> the matching peer's EpicAccountId STRING (or NULL).
+// No PlatformState needed (uses the last-refreshed g_peers table) so
+// EOS_EpicAccountId_FromString can be made to map a Steam external id to the peer's
+// REAL epic handle. WHY: UE's FUserManagerEOS::GetExternalIdMapping treats EVERY
+// external id as an epic id (FromString -> IsValid -> registry Find); a Steam friend
+// id would FromString to NULL, so the friend is never resolved/enqueued for the
+// friends "Join Game" search. Mapping the steam id to the peer's real epic (NOT the
+// local user) lets the epic-keyed registry round-trip without violating the
+// one-puid<->one-epic invariant (the regression that returning the LOCAL handle
+// caused — see palworld_stubs EpicAccountId_FromString).
+const char* social_bridge_resolve_epic_by_steam(const char* steam_id) {
+    if (!steam_id || !steam_id[0]) return NULL;
+    for (int i = 0; i < g_peer_count; i++) {
+        if (g_peers[i].valid && g_peers[i].steam_id[0] &&
+            strcmp(g_peers[i].steam_id, steam_id) == 0 &&
             g_peers[i].epic.id_string[0]) {
             return g_peers[i].epic.id_string;
         }
@@ -497,6 +611,8 @@ static void broadcast_own_beacon(PlatformState* p) {
     strncpy(ub.epic_id, g_auth_state.account_id.id_string, 32);
     const char* puid = local_product_id_string(p);
     if (puid) strncpy(ub.puid, puid, 32);
+    const char* steam_id = local_steam_id_string();
+    if (steam_id) strncpy(ub.steam_id, steam_id, sizeof(ub.steam_id) - 1);
     strncpy(ub.display_name, g_auth_state.display_name, sizeof(ub.display_name) - 1);
     strncpy(ub.join_info, g_local_presence.join_info, sizeof(ub.join_info) - 1);
     memcpy(ub.records, g_local_presence.records, sizeof(ub.records));
@@ -539,7 +655,18 @@ void social_bridge_tick(PlatformState* p) {
         // actually has a joinable session; the single fetch then runs against
         // complete data (session + presence + display name) in a clean
         // post-login window, succeeds, and the host resolves as an online user.
-        if (is_new && pf->session_id[0] == '\0') continue;
+        //
+        // "Joinable" can be a discovered EOS session (session_id) OR a
+        // presence-enabled lobby, whose join data arrives as presence records +
+        // join-info on the host's user beacon (no session_id — the lobby is not a
+        // session). EOSPlus+Steam titles like StarRupture are purely the latter:
+        // their friends "Join Game" reads the host's presence, and the game does
+        // its one-shot fetch off the OnPresenceChanged notification we fire here.
+        // Gate on record_count (the lobby presence is fully populated once its
+        // attributes have propagated) so the fetch still runs against complete
+        // data; without this the hold never releases for lobby hosts and the
+        // browser shows "No sessions available" forever.
+        if (is_new && pf->session_id[0] == '\0' && pf->record_count == 0) continue;
 
         uint32_t fp = presence_fingerprint(pf);
         if (!is_new && np->presence_fp == fp) continue;  // nothing changed
@@ -677,7 +804,7 @@ EOS_DECLARE_FUNC(EOS_Bool) EOS_Presence_HasPresence(EOS_HPresence Handle, const 
 }
 
 EOS_DECLARE_FUNC(EOS_EResult) EOS_Presence_CopyPresence(EOS_HPresence Handle, const EOS_Presence_CopyPresenceOptions* Options, EOS_Presence_Info** OutPresence) {
-    (void)Handle;
+    PlatformState* plat = (PlatformState*)Handle;
     if (!OutPresence) return EOS_InvalidParameters;
     *OutPresence = NULL;
     EOS_EpicAccountId target = Options ? Options->TargetUserId : NULL;
@@ -699,11 +826,15 @@ EOS_DECLARE_FUNC(EOS_EResult) EOS_Presence_CopyPresence(EOS_HPresence Handle, co
     info->ApiVersion = EOS_PRESENCE_INFO_API_LATEST;
     info->Status = EOS_PS_Online;
     info->UserId = target;
-    info->ProductId = "Satisfactory";
-    info->ProductVersion = "1.0";
+    // Report the peer with OUR product identity — a LAN clone runs the same game,
+    // and the game filters friends whose presence ProductId/Version differs from
+    // its own (a hardcoded "Satisfactory" hid every other game's host). Falls back
+    // to a neutral string if the platform didn't carry product info.
+    info->ProductId = (plat && plat->product_id[0]) ? plat->product_id : "EOSLAN";
+    info->ProductVersion = (plat && plat->product_version[0]) ? plat->product_version : "1.0";
     info->Platform = "EOSLAN";
-    info->RichText = "Hosting a game";
-    info->ProductName = "Satisfactory";
+    info->RichText = "In Game";
+    info->ProductName = (plat && plat->product_name[0]) ? plat->product_name : "EOSLAN";
     info->IntegratedPlatform = "";
     // Relay the host's REAL presence data records (from the LAN announce).
     int n = (pf->record_count > MAX_PRESENCE_RECORDS) ? MAX_PRESENCE_RECORDS : pf->record_count;
@@ -717,7 +848,11 @@ EOS_DECLARE_FUNC(EOS_EResult) EOS_Presence_CopyPresence(EOS_HPresence Handle, co
     info->RecordsCount = n;
     info->Records = (n > 0) ? blk->recs : NULL;
     *OutPresence = info;
-    EOS_LOG_INFO(">>> EOS_Presence_CopyPresence: Online presence for peer, %d record(s)", n);
+    EOS_LOG_INFO(">>> EOS_Presence_CopyPresence: peer product='%s' v='%s', join_info='%s', %d record(s)",
+                 info->ProductId, info->ProductVersion, pf->join_info, n);
+    for (int i = 0; i < n; i++) {
+        EOS_LOG_INFO(">>>   presence record[%d]: '%s' = '%s'", i, blk->recs[i].Key, blk->recs[i].Value);
+    }
     return EOS_Success;
 }
 

@@ -318,6 +318,8 @@ void discovery_broadcast_user(DiscoveryService* ds, const UserBeacon* user) {
     strncpy((char*)(buf + offset), user->epic_id, 32); offset += 33;
     memset(buf + offset, 0, 33);
     strncpy((char*)(buf + offset), user->puid, 32); offset += 33;
+    memset(buf + offset, 0, 24);                                  // steam_id (decimal, "" if unset)
+    strncpy((char*)(buf + offset), user->steam_id, 23); offset += 24;
     memset(buf + offset, 0, PEER_DISPLAY_NAME_LEN);
     strncpy((char*)(buf + offset), user->display_name, PEER_DISPLAY_NAME_LEN - 1); offset += PEER_DISPLAY_NAME_LEN;
     memset(buf + offset, 0, PRESENCE_JOININFO_LEN);
@@ -354,9 +356,10 @@ static bool parse_user_beacon(const uint8_t* buf, int len, UserBeacon* user) {
     int offset = 0;
     memset(user, 0, sizeof(*user));
 
-    if (offset + 33 + 33 + PEER_DISPLAY_NAME_LEN + PRESENCE_JOININFO_LEN + 1 > len) return false;
+    if (offset + 33 + 33 + 24 + PEER_DISPLAY_NAME_LEN + PRESENCE_JOININFO_LEN + 1 > len) return false;
     memcpy(user->epic_id, buf + offset, 32); user->epic_id[32] = '\0'; offset += 33;
     memcpy(user->puid, buf + offset, 32); user->puid[32] = '\0'; offset += 33;
+    memcpy(user->steam_id, buf + offset, 23); user->steam_id[23] = '\0'; offset += 24;
     memcpy(user->display_name, buf + offset, PEER_DISPLAY_NAME_LEN);
     user->display_name[PEER_DISPLAY_NAME_LEN - 1] = '\0'; offset += PEER_DISPLAY_NAME_LEN;
     memcpy(user->join_info, buf + offset, PRESENCE_JOININFO_LEN);
@@ -663,6 +666,16 @@ Session* discovery_get_sessions(DiscoveryService* ds, int* out_count) {
 
     // Return pointer to first session in cache
     return &ds->cache[0].session;
+}
+
+const Session* discovery_find_cached_session(DiscoveryService* ds, const char* session_id) {
+    if (!ds || !session_id) return NULL;
+    for (int i = 0; i < ds->cache_count; i++) {
+        if (strcmp(ds->cache[i].session.session_id, session_id) == 0) {
+            return &ds->cache[i].session;
+        }
+    }
+    return NULL;
 }
 
 void discovery_clear_sessions(DiscoveryService* ds) {

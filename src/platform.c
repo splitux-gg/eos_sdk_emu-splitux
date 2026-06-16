@@ -14,6 +14,12 @@
 bool g_sdk_initialized = false;
 PlatformState* g_platforms[8] = {NULL};
 
+// ProductName/ProductVersion live on EOS_InitializeOptions (not Platform_Options);
+// captured here so EOS_Platform_Create can stamp them onto the platform for
+// presence reporting.
+static char g_product_name[128] = {0};
+static char g_product_version[64] = {0};
+
 EOS_DECLARE_FUNC(EOS_EResult) EOS_Initialize(const EOS_InitializeOptions* Options) {
     if (!Options || Options->ApiVersion != EOS_INITIALIZE_API_LATEST) {
         return EOS_InvalidParameters;
@@ -31,6 +37,8 @@ EOS_DECLARE_FUNC(EOS_EResult) EOS_Initialize(const EOS_InitializeOptions* Option
     log_init(LOG_LEVEL_TRACE, log_path);
 
     g_sdk_initialized = true;
+    if (Options->ProductName)    strncpy(g_product_name, Options->ProductName, sizeof(g_product_name) - 1);
+    if (Options->ProductVersion) strncpy(g_product_version, Options->ProductVersion, sizeof(g_product_version) - 1);
     EOS_LOG_INFO("EOS SDK Initialized: %s v%s",
                  Options->ProductName, Options->ProductVersion);
 
@@ -128,6 +136,13 @@ EOS_DECLARE_FUNC(EOS_HPlatform) EOS_Platform_Create(const EOS_Platform_Options* 
     platform->initialized = true;
     platform->network_status = EOS_NS_Online;
     platform->app_status = EOS_AS_Foreground;
+
+    // Deep-copy the product identity (Options strings are caller-owned). Reported
+    // back as a peer's presence product so the game doesn't treat the LAN host as a
+    // different game and filter it out of Join Game (calloc already zeroed these).
+    if (Options->ProductId) strncpy(platform->product_id, Options->ProductId, sizeof(platform->product_id) - 1);
+    strncpy(platform->product_name, g_product_name, sizeof(platform->product_name) - 1);
+    strncpy(platform->product_version, g_product_version, sizeof(platform->product_version) - 1);
 
     // Initialize LAN config with defaults
     platform->lan_config.discovery_port = 23456;

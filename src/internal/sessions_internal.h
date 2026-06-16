@@ -27,7 +27,14 @@ typedef struct DiscoveryService DiscoveryService;
 // LAN announce so the joiner's EOS_Presence_GetJoinInfo/CopyPresence return
 // exactly what the host published (games parse their own join-info format).
 #define PRESENCE_JOININFO_LEN 256   // EOS_PRESENCE_DATA_MAX_VALUE_LENGTH + 1
-#define MAX_PRESENCE_RECORDS 8
+// 24 (was 8): a presence-enabled lobby host advertises ~14 attributes
+// (CUSTOMJOININFO, MapName, conn counts, GameMode, SESSIONTEMPLATENAME, OSSv1,
+// ALLOWEDPLATFORM, BUILDCL, MATCHTIMEOUT, BuildUniqueId, ...). UE copies every
+// presence record verbatim into FOnlineUserPresence.Status.Properties, and the
+// game's own join code reads those keys to decide joinable — so truncating to 8
+// dropped keys the game may gate on (platform/build/template). Beacon buffer is
+// 64KB; 24 records (~7.7KB) fits, and prec_count is a uint8_t (<=255).
+#define MAX_PRESENCE_RECORDS 24
 #define PRESENCE_KEY_LEN 65         // EOS_PRESENCE_DATA_MAX_KEY_LENGTH + 1
 #define PRESENCE_VALUE_LEN 256      // EOS_PRESENCE_DATA_MAX_VALUE_LENGTH + 1
 
@@ -46,6 +53,7 @@ typedef struct {
 typedef struct UserBeacon {
     char epic_id[33];                       // 32-hex EpicAccountId string
     char puid[33];                          // 32-hex ProductUserId string
+    char steam_id[24];                      // decimal Steam ID (EOSLAN_STEAM_ID), "" if unset
     char display_name[PEER_DISPLAY_NAME_LEN];
     char join_info[PRESENCE_JOININFO_LEN];
     PresenceRecord records[MAX_PRESENCE_RECORDS];
@@ -156,7 +164,13 @@ typedef struct {
 // Session details handle
 typedef struct {
     uint32_t magic;  // 0x53445448 = "SDTH"
-    Session session;  // Copy of session data
+    Session session;  // Copy of session data (snapshot at creation time)
+    // Back-pointer to the owning sessions state so CopyInfo can re-pull the
+    // LATEST advertised session from the live discovery cache by session_id.
+    // Without this the handle is frozen at search/Find time; a joiner that
+    // searched while the host's session was still incomplete (e.g. host mid-load,
+    // 17 of 27 attrs) would otherwise read stale attributes and fail to migrate.
+    struct SessionsState* sessions_state;
 } SessionDetailsHandle;
 
 // Active session handle
@@ -217,11 +231,30 @@ void generate_session_id(char* buffer, size_t buffer_size);
 const char* social_bridge_local_join_info(void);
 const PresenceRecord* social_bridge_local_records(int* out_count);
 
+// Auto-derive the local user's published presence from a presence-enabled lobby
+// (real EOS behavior). Called by lobby.c on create/update/join of a
+// bPresenceEnabled lobby; no-op if the game sets presence itself. Lets games that
+// never touch the Presence interface (e.g. StarRupture) still expose a joinable
+// presence record + join-info to friends' CopyPresence/GetJoinInfo.
+void social_bridge_set_presence_from_lobby(const char* join_info,
+                                           const PresenceRecord* records, int record_count);
+void social_bridge_clear_lobby_presence(void);
+
 // Resolve an external (Epic) account id string -> the matching ProductUserId:
 // the local user's own Connect id, or a discovered peer's (carried in its LAN
 // beacon as epic_id+puid). Used by EOS_Connect_GetExternalAccountMapping so the
 // game can resolve a joinable host's (and its own) identity during an EOS join.
 EOS_ProductUserId social_bridge_resolve_puid(PlatformState* platform, const char* epic_id);
+// Resolve a STEAM external account id -> ProductUserId (peer Steam ID relayed in
+// its LAN beacon). Used by EOS_Connect_GetExternalAccountMapping for type=STEAM so
+// Steam-friend-driven join UIs can attribute a discovered lobby to a friend.
+EOS_ProductUserId social_bridge_resolve_puid_by_steam(PlatformState* platform, const char* steam_id);
+
+// Resolve a STEAM external id -> peer's EpicAccountId STRING (last-refreshed peer
+// table; no PlatformState). Lets EOS_EpicAccountId_FromString map a Steam external
+// id to the peer's real epic handle so UE's epic-keyed external-id-mapping registry
+// (FUserManagerEOS) round-trips and the Steam friend gets enqueued for join search.
+const char* social_bridge_resolve_epic_by_steam(const char* steam_id);
 
 // Reverse of the above: given a ProductUserId string, return the EpicAccountId
 // string it belongs to (the local user, or a discovered peer carried in its LAN
