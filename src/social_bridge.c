@@ -524,6 +524,8 @@ const char* social_bridge_resolve_epic_by_puid(PlatformState* p, const char* pui
         if (g_peers[i].valid && g_peers[i].puid[0] &&
             strncmp(g_peers[i].puid, puid, PRODUCT_USER_ID_LENGTH) == 0 &&
             g_peers[i].epic.id_string[0]) {
+            EOS_LOG_INFO(">>> resolve_epic_by_puid: peer[%d] puid '%s' epic '%s' steam '%s'",
+                         i, g_peers[i].puid, g_peers[i].epic.id_string, g_peers[i].steam_id);
             return g_peers[i].epic.id_string;
         }
     }

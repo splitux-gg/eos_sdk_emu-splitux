@@ -1093,7 +1093,7 @@ EOS_DECLARE_FUNC(EOS_EResult) EOS_Connect_GetProductUserIdMapping(
         if (*InOutBufferLength >= required) {
             strcpy(OutBuffer, epic);
             *InOutBufferLength = required;
-            EOS_LOG_INFO(">>> GetProductUserIdMapping returning EpicAccountId=%s", epic);
+            EOS_LOG_INFO(">>> GetProductUserIdMapping: puid '%s' -> EpicAccountId=%s", puid_str, epic);
             return EOS_Success;
         }
         *InOutBufferLength = required;
