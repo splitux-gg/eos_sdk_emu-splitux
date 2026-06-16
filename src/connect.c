@@ -567,6 +567,7 @@ EOS_DECLARE_FUNC(EOS_EResult) EOS_ProductUserId_ToString(
 
 EOS_DECLARE_FUNC(EOS_ProductUserId) EOS_ProductUserId_FromString(const char* ProductUserIdString) {
     if (!ProductUserIdString) return NULL;
+    EOS_LOG_INFO("ProductUserId_FromString('%s')", ProductUserIdString);
 
     size_t len = strlen(ProductUserIdString);
     if (len != PRODUCT_USER_ID_LENGTH) return NULL;
