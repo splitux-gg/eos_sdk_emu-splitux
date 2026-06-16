@@ -9,6 +9,11 @@
 #include "internal/auth_internal.h"
 #include <string.h>
 
+// Implemented in social_bridge.c. Declared here (not via sessions_internal.h, which
+// pulls in session types that clash with this file's platform-stub definitions) so
+// EOS_EpicAccountId_FromString can map a Steam external id -> the peer's real epic.
+extern const char* social_bridge_resolve_epic_by_steam(const char* steam_id);
+
 // Suppress unused parameter warnings
 #define UNUSED(x) (void)(x)
 
@@ -51,6 +56,21 @@ EOS_DECLARE_FUNC(EOS_EpicAccountId) EOS_EpicAccountId_FromString(const char* Str
     // FoundEpicAccountId -> hard crash). NULL makes EpicAccountId_IsValid() return
     // false, so the caller treats the id as absent (PUID-only) instead of mismatched.
     if (!String || strlen(String) != EPIC_ACCOUNT_ID_LENGTH) {
+        // Not a 32-hex epic id. UE's FUserManagerEOS::GetExternalIdMapping treats
+        // EVERY external id as an epic id (FromString -> IsValid -> registry Find),
+        // so a Steam friend id ('765611...') would resolve to NULL and the friend is
+        // never enqueued for the friends "Join Game" search. Map a known Steam id to
+        // the peer's REAL epic id and intern THAT — so the epic-keyed registry
+        // round-trips (FindOrAdd on the steam query and Find on the read both land on
+        // the host's real epic handle). Returns the REMOTE peer's epic, never the
+        // local user's, so it does NOT reintroduce the one-puid<->one-epic crash.
+        if (String) {
+            const char* peer_epic = social_bridge_resolve_epic_by_steam(String);
+            if (peer_epic && strlen(peer_epic) == EPIC_ACCOUNT_ID_LENGTH) {
+                EOS_LOG_INFO("EpicAccountId_FromString: external id '%s' -> peer epic %s", String, peer_epic);
+                return EOS_EpicAccountId_FromString(peer_epic);  // recurse: interns the real epic
+            }
+        }
         return NULL;
     }
 

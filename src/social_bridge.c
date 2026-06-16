@@ -530,6 +530,28 @@ const char* social_bridge_resolve_epic_by_puid(PlatformState* p, const char* pui
     return NULL;
 }
 
+// Resolve a STEAM external id -> the matching peer's EpicAccountId STRING (or NULL).
+// No PlatformState needed (uses the last-refreshed g_peers table) so
+// EOS_EpicAccountId_FromString can be made to map a Steam external id to the peer's
+// REAL epic handle. WHY: UE's FUserManagerEOS::GetExternalIdMapping treats EVERY
+// external id as an epic id (FromString -> IsValid -> registry Find); a Steam friend
+// id would FromString to NULL, so the friend is never resolved/enqueued for the
+// friends "Join Game" search. Mapping the steam id to the peer's real epic (NOT the
+// local user) lets the epic-keyed registry round-trip without violating the
+// one-puid<->one-epic invariant (the regression that returning the LOCAL handle
+// caused — see palworld_stubs EpicAccountId_FromString).
+const char* social_bridge_resolve_epic_by_steam(const char* steam_id) {
+    if (!steam_id || !steam_id[0]) return NULL;
+    for (int i = 0; i < g_peer_count; i++) {
+        if (g_peers[i].valid && g_peers[i].steam_id[0] &&
+            strcmp(g_peers[i].steam_id, steam_id) == 0 &&
+            g_peers[i].epic.id_string[0]) {
+            return g_peers[i].epic.id_string;
+        }
+    }
+    return NULL;
+}
+
 // ===================== Push notifications =====================
 // Games (e.g. Satisfactory) query the friends list ONCE when the Join menu
 // opens and cache it; re-opening doesn't re-query. So returning peers on demand

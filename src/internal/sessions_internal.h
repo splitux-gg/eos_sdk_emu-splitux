@@ -256,6 +256,12 @@ EOS_ProductUserId social_bridge_resolve_puid(PlatformState* platform, const char
 // Steam-friend-driven join UIs can attribute a discovered lobby to a friend.
 EOS_ProductUserId social_bridge_resolve_puid_by_steam(PlatformState* platform, const char* steam_id);
 
+// Resolve a STEAM external id -> peer's EpicAccountId STRING (last-refreshed peer
+// table; no PlatformState). Lets EOS_EpicAccountId_FromString map a Steam external
+// id to the peer's real epic handle so UE's epic-keyed external-id-mapping registry
+// (FUserManagerEOS) round-trips and the Steam friend gets enqueued for join search.
+const char* social_bridge_resolve_epic_by_steam(const char* steam_id);
+
 // Reverse of the above: given a ProductUserId string, return the EpicAccountId
 // string it belongs to (the local user, or a discovered peer carried in its LAN
 // beacon), or NULL if unknown. Used by EOS_Connect_GetProductUserIdMapping so the
