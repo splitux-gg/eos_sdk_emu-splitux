@@ -157,16 +157,25 @@ EOS_DECLARE_FUNC(void) EOS_CustomInvites_AcceptRequestToJoin(EOS_HCustomInvites 
     (void)0;
 }
 
+// CustomInvites notify registration must return a VALID (non-zero) notification
+// id. Games (e.g. Make Way, PlayEveryWare plugin) call these right after
+// GetCustomInvitesInterface() during login; returning 0 made the C# wrapper
+// treat the handle as invalid and NRE in RegisterInviteNotifications, hanging
+// the load screen. LAN co-op never delivers out-of-band custom invites (join is
+// via lobby/LAN discovery), so we just hand back stable non-zero ids and no-op.
 EOS_DECLARE_FUNC(EOS_NotificationId) EOS_CustomInvites_AddNotifyCustomInviteAccepted(EOS_HCustomInvites Handle, const EOS_CustomInvites_AddNotifyCustomInviteAcceptedOptions* Options, void* ClientData, const EOS_CustomInvites_OnCustomInviteAcceptedCallback NotificationFn) {
-    return (EOS_NotificationId)0;
+    (void)Handle; (void)Options; (void)ClientData; (void)NotificationFn;
+    return (EOS_NotificationId)0xC1;
 }
 
 EOS_DECLARE_FUNC(EOS_NotificationId) EOS_CustomInvites_AddNotifyCustomInviteReceived(EOS_HCustomInvites Handle, const EOS_CustomInvites_AddNotifyCustomInviteReceivedOptions* Options, void* ClientData, const EOS_CustomInvites_OnCustomInviteReceivedCallback NotificationFn) {
-    return (EOS_NotificationId)0;
+    (void)Handle; (void)Options; (void)ClientData; (void)NotificationFn;
+    return (EOS_NotificationId)0xC2;
 }
 
 EOS_DECLARE_FUNC(EOS_NotificationId) EOS_CustomInvites_AddNotifyCustomInviteRejected(EOS_HCustomInvites Handle, const EOS_CustomInvites_AddNotifyCustomInviteRejectedOptions* Options, void* ClientData, const EOS_CustomInvites_OnCustomInviteRejectedCallback NotificationFn) {
-    return (EOS_NotificationId)0;
+    (void)Handle; (void)Options; (void)ClientData; (void)NotificationFn;
+    return (EOS_NotificationId)0xC3;
 }
 
 EOS_DECLARE_FUNC(EOS_NotificationId) EOS_CustomInvites_AddNotifyRequestToJoinAccepted(EOS_HCustomInvites Handle, const EOS_CustomInvites_AddNotifyRequestToJoinAcceptedOptions* Options, void* ClientData, const EOS_CustomInvites_OnRequestToJoinAcceptedCallback NotificationFn) {
@@ -590,7 +599,12 @@ EOS_DECLARE_FUNC(EOS_HAntiCheatServer) EOS_Platform_GetAntiCheatServerInterface(
 }
 
 EOS_DECLARE_FUNC(EOS_HCustomInvites) EOS_Platform_GetCustomInvitesInterface(EOS_HPlatform Handle) {
-    return (EOS_HCustomInvites)0;
+    // Must be non-null: games gate invite-notify registration on this handle and
+    // NRE if it's null (see AddNotifyCustomInvite* above). The CustomInvites stubs
+    // ignore the handle, so a stable singleton sentinel is sufficient for LAN.
+    (void)Handle;
+    static int custom_invites_singleton;
+    return (EOS_HCustomInvites)&custom_invites_singleton;
 }
 
 EOS_DECLARE_FUNC(EOS_HIntegratedPlatform) EOS_Platform_GetIntegratedPlatformInterface(EOS_HPlatform Handle) {
